@@ -1,0 +1,1 @@
+es el que viaja del front al back para ver si los datos son validos y correctos
