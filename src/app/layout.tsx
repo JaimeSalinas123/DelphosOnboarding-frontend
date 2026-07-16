@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Navbar from "@/components/global/Navbar";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,7 +11,7 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
+}); // <-- ¡Corchete extra eliminado!
 
 export const metadata: Metadata = {
   title: "Delphos Onboarding",
@@ -29,8 +29,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-neutral-primary">
-        <Navbar />
-        <div className="flex flex-1 flex-col pt-16">{children}</div>
+        <AuthProvider>
+          <div className="flex flex-1 flex-col">{children}</div>
+        </AuthProvider>
       </body>
     </html>
   );
