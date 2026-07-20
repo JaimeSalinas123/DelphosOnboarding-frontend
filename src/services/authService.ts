@@ -103,5 +103,19 @@ export const authService = {
       return localStorage.getItem('delphos_token');
     }
     return null;
+  },
+
+  // --- NUEVAS FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA ---
+
+  // Función para solicitar el correo de recuperación
+  recuperarPassword: async (email: string) => {
+    const response = await postJson('/recuperar-password', { email });
+    return handleResponse(response);
+  },
+
+  // Función para enviar la nueva contraseña junto con los tokens de seguridad
+  resetearPassword: async (access_token: string, refresh_token: string, new_password: string) => {
+    const response = await postJson('/resetear-password', { access_token, refresh_token, new_password });
+    return handleResponse(response);
   }
 };
