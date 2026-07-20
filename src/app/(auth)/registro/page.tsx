@@ -195,10 +195,10 @@ export default function RegistroPage() {
               required
             >
               <option value="" disabled>Selecciona tu área...</option>
-              <option value="TI">Capital Humano</option>
-              <option value="RRHH">La Plaza Digital</option>
-              <option value="Finanzas">Relaciones Corporativas</option>
-              <option value="Operaciones">Research &amp; Development</option>
+              <option value="Capital Humano">Capital Humano</option>
+              <option value="La Plaza Digital">La Plaza Digital</option>
+              <option value="Relaciones Corporativas">Relaciones Corporativas</option>
+              <option value="Research & Development">Research &amp; Development</option>
             </select>
           </div>
 
