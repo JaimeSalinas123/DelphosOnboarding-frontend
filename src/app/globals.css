@@ -42,6 +42,7 @@
   /* Micro-animaciones de la vista Ecosistema Delphos. */
   --animate-invite: invite-pulse 1.6s ease-in-out infinite;
   --animate-loaderPulse: loader-pulse 1.4s ease-in-out infinite;
+  --animate-bgBreathe: bg-breathe 6s ease-in-out infinite;
 }
 
 body {
@@ -76,6 +77,18 @@ body {
   }
 }
 
+@keyframes bg-breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+}
+
 /* --- Pantalla de bienvenida (primer ingreso) --- */
 
 @keyframes blob-float {
@@ -101,7 +114,8 @@ body {
   .animate-invite,
   .animate-loaderPulse,
   .animate-blob-float,
-  .animate-blob-float-delayed {
+  .animate-blob-float-delayed,
+  .animate-bgBreathe {
     animation: none !important;
   }
 }

@@ -51,7 +51,7 @@ export default function PanelInfoModulo() {
           animate="visible"
           exit="exit"
           aria-live="polite"
-          className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 md:inset-x-auto md:inset-y-0 md:right-0 md:flex md:items-center md:pr-6"
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 md:inset-x-auto md:inset-y-0 md:right-0 md:flex md:items-center md:pr-16"
         >
           <div
             className="deinsa-scroll max-h-[72vh] overflow-y-auto rounded-t-3xl border p-7 shadow-2xl backdrop-blur-xl md:max-h-[88vh] md:w-[460px] md:rounded-3xl md:p-9"

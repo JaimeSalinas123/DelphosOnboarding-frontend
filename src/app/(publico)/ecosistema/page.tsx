@@ -7,6 +7,7 @@ import { modulos } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
 import PanelInfoModulo from '@/components/ecosistema/PanelInfoModulo';
 import EstadoVacio from '@/components/ecosistema/EstadoVacio';
+import FondoEcosistema from '@/components/ecosistema/FondoEcosistema';
 
 const EcosistemaScene = dynamic(
   () => import('@/components/ecosistema/EcosistemaScene'),
@@ -94,6 +95,7 @@ export default function EcosistemaPage() {
   const [mounted, setMounted] = useState(false);
 
   const selectedId = useEcosistemaStore((s) => s.selectedId);
+  const visitedIds = useEcosistemaStore((s) => s.visitedIds);
   const step = useEcosistemaStore((s) => s.step);
   const deselect = useEcosistemaStore((s) => s.deselect);
   const select = useEcosistemaStore((s) => s.select);
@@ -135,8 +137,7 @@ export default function EcosistemaPage() {
 
   return (
     <main className="relative w-full flex-1 overflow-hidden bg-white">
-      {/* El fondo de la vista ahora vive dentro del Canvas (ver AnimatedBackground
-          en EcosistemaScene.tsx): se tiñe con el color del módulo seleccionado. */}
+      <FondoEcosistema />
 
       <header className="pointer-events-none absolute left-0 top-0 z-10 p-5 md:p-7">
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-400">
@@ -148,6 +149,24 @@ export default function EcosistemaPage() {
             · Círculo Virtuoso
           </span>
         </h1>
+
+        <div className="mt-3 flex items-center gap-2">
+          <div className="h-1 w-24 overflow-hidden rounded-full bg-slate-900/10">
+            <div
+              className="h-full rounded-full bg-brand-orange transition-[width] duration-500 ease-out"
+              style={{
+                width: `${(visitedIds.length / modulos.length) * 100}%`,
+              }}
+            />
+          </div>
+          <p className="text-[11px] font-medium tabular-nums text-slate-400">
+            {visitedIds.length}/{modulos.length} explorados
+          </p>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {!selectedId && <EstadoVacio key="vacio" />}
+        </AnimatePresence>
       </header>
 
       <div className="absolute inset-0 z-[1]">
@@ -164,9 +183,14 @@ export default function EcosistemaPage() {
         )}
       </div>
 
-      <AnimatePresence mode="wait">
-        {!selectedId && <EstadoVacio key="vacio" />}
-      </AnimatePresence>
+      {/* Viñeta sutil: oscurece los bordes para dar profundidad cinematográfica. */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[2]"
+        style={{
+          boxShadow: 'inset 0 0 18vw rgba(23, 23, 23, 0.16)',
+        }}
+      />
+
       <PanelInfoModulo />
 
       <nav aria-label="Módulos del ecosistema Delphos" className="sr-only">

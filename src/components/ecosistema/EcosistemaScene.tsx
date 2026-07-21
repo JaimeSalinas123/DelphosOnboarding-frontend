@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useRef, useEffect } from 'react';
+import { Suspense, useRef, useEffect, useMemo } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, AdaptiveDpr } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import CirculoVirtuoso from './CirculoVirtuoso';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { BRAND_ORANGE } from '@/lib/theme';
 
 interface EcosistemaSceneProps {
   reducedMotion: boolean;
@@ -17,12 +18,10 @@ interface EcosistemaSceneProps {
 
 /**
  * Parallax sutil siguiendo el mouse. Se aplica sobre un grupo contenedor
- * para no pelear con OrbitControls. Sin dolly-in/zoom al seleccionar: la
- * distancia de cámara se mantiene siempre fija.
- *
- * Desplaza el anillo hacia la izquierda: un poco siempre (deja aire a la
- * tarjeta de info) y bastante más al seleccionar un módulo, para que el
- * anillo quede centrado en el espacio libre y no debajo del panel derecho.
+ * para no pelear con OrbitControls. Sin dolly-in (la cámara nunca "se
+ * acerca"), pero sí se achica un poco al seleccionar, junto con el
+ * desplazamiento a la izquierda, para que la tarjeta de info (ahora más
+ * ancha) no quede pegada al anillo.
  */
 function SceneRig({
   reducedMotion,
@@ -42,11 +41,14 @@ function SceneRig({
     if (!g) return;
 
     const baseX = isDesktop ? -0.7 : -0.25;
-    const selectedX = isDesktop ? -1.55 : -0.25;
+    const selectedX = isDesktop ? -2.3 : -0.35;
     const targetX = selectedId ? selectedX : baseX;
     g.position.x = THREE.MathUtils.damp(g.position.x, targetX, 4.5, delta);
 
-    // Parallax sutil (sin dolly ni escalado: la cámara nunca "se acerca").
+    const targetScale = selectedId ? (isDesktop ? 0.82 : 0.9) : 1;
+    g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, targetScale, 4.5, delta));
+
+    // Parallax sutil (sin dolly: la cámara nunca "se acerca").
     const rx = reducedMotion ? 0.18 : 0.18 - pointer.y * 0.28;
     const ry = reducedMotion ? 0 : pointer.x * 0.34;
     g.rotation.x = THREE.MathUtils.damp(g.rotation.x, rx, 3.7, delta);
@@ -56,37 +58,109 @@ function SceneRig({
   return <group ref={groupRef}>{children}</group>;
 }
 
-const SELECTED_BG = new THREE.Color('#FFFFFF').lerp(
-  new THREE.Color('#DD6544'),
-  0.4
-);
+const PARTICLE_COUNT = 160;
+// Punto aproximado donde termina el nodo seleccionado en pantalla (dado el
+// desplazamiento a la izquierda de SceneRig + la rotación al frente del
+// anillo). El polvo ambiental converge suavemente hacia ahí al seleccionar.
+const ATTRACT_POINT = new THREE.Vector3(-1.8, 0.5, 2.6);
 
 /**
- * Fondo sólido de la escena (no CSS): se tiñe de naranja al seleccionar
- * cualquier módulo (mismo color para todos, no depende de cuál sea) y
- * vuelve a blanco al deseleccionar. Al ser el propio `scene.background`
- * (no un canvas transparente) cubre todo el rectángulo de forma pareja.
+ * Polvo ambiental disperso alrededor del anillo: le da profundidad al fondo
+ * sin competir con los nodos. Al seleccionar un módulo, las partículas se
+ * dejan atraer levemente hacia él en vez de quedarse quietas. Se omite en
+ * dispositivos de bajo rendimiento.
  */
-function AnimatedBackground() {
-  const { scene } = useThree();
+function PolvoAmbiental({ reducedMotion }: { reducedMotion: boolean }) {
+  const pointsRef = useRef<THREE.Points>(null);
   const selectedId = useEcosistemaStore((s) => s.selectedId);
 
-  const targetColor = selectedId ? SELECTED_BG : new THREE.Color('#FFFFFF');
-
-  useEffect(() => {
-    if (!(scene.background instanceof THREE.Color)) {
-      scene.background = new THREE.Color('#FFFFFF');
+  const homePositions = useMemo(() => {
+    const arr = new Float32Array(PARTICLE_COUNT * 3);
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const r = 5.5 + Math.random() * 8;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = Math.abs(r * Math.cos(phi) * 0.55) + 0.4;
+      arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta) - 2.5;
     }
-  }, [scene]);
+    return arr;
+  }, []);
+
+  const livePositions = useMemo(
+    () => homePositions.slice(),
+    [homePositions]
+  );
 
   useFrame((_, delta) => {
-    const bg = scene.background;
-    if (bg instanceof THREE.Color) {
-      bg.lerp(targetColor, 1 - Math.exp(-3.2 * delta));
+    if (pointsRef.current && !reducedMotion) {
+      pointsRef.current.rotation.y += delta * 0.02;
     }
+
+    const posAttr = pointsRef.current?.geometry.attributes.position as
+      | THREE.BufferAttribute
+      | undefined;
+    if (!posAttr) return;
+
+    const pull = selectedId ? 0.16 : 0;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const ix = i * 3;
+      const iy = ix + 1;
+      const iz = ix + 2;
+      const targetX = THREE.MathUtils.lerp(
+        homePositions[ix],
+        ATTRACT_POINT.x,
+        pull
+      );
+      const targetY = THREE.MathUtils.lerp(
+        homePositions[iy],
+        ATTRACT_POINT.y,
+        pull
+      );
+      const targetZ = THREE.MathUtils.lerp(
+        homePositions[iz],
+        ATTRACT_POINT.z,
+        pull
+      );
+      livePositions[ix] = THREE.MathUtils.damp(
+        livePositions[ix],
+        targetX,
+        2,
+        delta
+      );
+      livePositions[iy] = THREE.MathUtils.damp(
+        livePositions[iy],
+        targetY,
+        2,
+        delta
+      );
+      livePositions[iz] = THREE.MathUtils.damp(
+        livePositions[iz],
+        targetZ,
+        2,
+        delta
+      );
+    }
+    posAttr.needsUpdate = true;
   });
 
-  return null;
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[livePositions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        color={BRAND_ORANGE}
+        size={0.045}
+        transparent
+        opacity={0.4}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+      />
+    </points>
+  );
 }
 
 function BackgroundDeselect() {
@@ -123,9 +197,11 @@ export default function EcosistemaScene({
     <Canvas
       dpr={lowPower ? 1 : [1, 2]}
       camera={{ position: [0, 2.9, 10.5], fov: 42 }}
-      gl={{ antialias: !lowPower, alpha: false }}
+      gl={{ antialias: !lowPower, alpha: true }}
     >
-      <AnimatedBackground />
+      {/* Sin fondo propio: deja ver el fondo CSS (FondoEcosistema) detrás del
+          canvas transparente. Ya no hay ContactShadows ni otro plano opaco
+          que pudiera quedar expuesto por esto. */}
 
       {/* Iluminación de estudio (brillante, funciona igual sobre el fondo claro) */}
       <ambientLight intensity={0.9} />
@@ -134,6 +210,7 @@ export default function EcosistemaScene({
       <directionalLight position={[0, 2, -6]} intensity={0.4} />
 
       <BackgroundDeselect />
+      {!lowPower && <PolvoAmbiental reducedMotion={reducedMotion} />}
 
       <Suspense fallback={null}>
         <SceneRig reducedMotion={reducedMotion} isDesktop={isDesktop}>

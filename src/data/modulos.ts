@@ -109,7 +109,7 @@ export const modulos: Modulo[] = [
     diferencial:
       'Elimina la dependencia del escritorio para los ciclos de evaluación.',
     color: '#12A5C9',
-    logo: 'mobile.svg',
+    logo: 'core.svg',
     angulo: 4 * paso,
   },
   {

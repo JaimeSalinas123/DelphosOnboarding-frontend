@@ -8,6 +8,8 @@ interface EcosistemaState {
   hoveredId: string | null;
   /** true mientras el usuario arrastra OrbitControls: pausa la rotación idle. */
   userInteracting: boolean;
+  /** ids de módulos que ya se seleccionaron al menos una vez en esta sesión. */
+  visitedIds: string[];
 
   select: (id: string) => void;
   deselect: () => void;
@@ -18,15 +20,27 @@ interface EcosistemaState {
   step: (direction: 1 | -1) => void;
 }
 
+function withVisited(visitedIds: string[], id: string): string[] {
+  return visitedIds.includes(id) ? visitedIds : [...visitedIds, id];
+}
+
 export const useEcosistemaStore = create<EcosistemaState>((set, get) => ({
   selectedId: null,
   hoveredId: null,
   userInteracting: false,
+  visitedIds: [],
 
-  select: (id) => set({ selectedId: id }),
+  select: (id) =>
+    set((state) => ({
+      selectedId: id,
+      visitedIds: withVisited(state.visitedIds, id),
+    })),
   deselect: () => set({ selectedId: null }),
   toggleSelect: (id) =>
-    set((state) => ({ selectedId: state.selectedId === id ? null : id })),
+    set((state) => ({
+      selectedId: state.selectedId === id ? null : id,
+      visitedIds: withVisited(state.visitedIds, id),
+    })),
   setHovered: (id) => set({ hoveredId: id }),
   setUserInteracting: (value) => set({ userInteracting: value }),
   step: (direction) => {
@@ -34,6 +48,10 @@ export const useEcosistemaStore = create<EcosistemaState>((set, get) => ({
     const currentIndex = getModuloIndex(selectedId);
     const total = modulos.length;
     const nextIndex = (currentIndex + direction + total) % total;
-    set({ selectedId: modulos[nextIndex].id });
+    const nextId = modulos[nextIndex].id;
+    set((state) => ({
+      selectedId: nextId,
+      visitedIds: withVisited(state.visitedIds, nextId),
+    }));
   },
 }));

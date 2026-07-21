@@ -28,6 +28,7 @@ export default function NodoModulo({
   const glowMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const ringMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const logoMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const badgeRef = useRef<THREE.Group>(null);
   const scaleRef = useRef(1);
   const velRef = useRef(0);
 
@@ -41,8 +42,10 @@ export default function NodoModulo({
 
   const hoveredId = useEcosistemaStore((s) => s.hoveredId);
   const selectedId = useEcosistemaStore((s) => s.selectedId);
+  const visitedIds = useEcosistemaStore((s) => s.visitedIds);
   const setHovered = useEcosistemaStore((s) => s.setHovered);
   const toggleSelect = useEcosistemaStore((s) => s.toggleSelect);
+  const visited = visitedIds.includes(modulo.id);
 
   const isSelected = selectedId === modulo.id;
   const isHovered = hoveredId === modulo.id;
@@ -119,6 +122,13 @@ export default function NodoModulo({
         delta
       );
     }
+
+    if (badgeRef.current) {
+      const bTarget = visited ? 1 : 0.0001;
+      badgeRef.current.scale.setScalar(
+        THREE.MathUtils.damp(badgeRef.current.scale.x, bTarget, 9, delta)
+      );
+    }
   });
 
   const over = (e: ThreeEvent<PointerEvent>) => {
@@ -185,6 +195,18 @@ export default function NodoModulo({
               toneMapped={false}
             />
           </mesh>
+
+          {/* Insignia de "ya visitado": aparece una vez que el usuario abrió este módulo. */}
+          <group ref={badgeRef} position={[R * 0.74, R * 0.74, 0.04]} scale={0.0001}>
+            <mesh raycast={() => null}>
+              <circleGeometry args={[0.17, 24]} />
+              <meshBasicMaterial color="#FFFFFF" toneMapped={false} />
+            </mesh>
+            <mesh position={[0, 0, 0.001]} raycast={() => null}>
+              <circleGeometry args={[0.1, 24]} />
+              <meshBasicMaterial color={color} toneMapped={false} />
+            </mesh>
+          </group>
         </group>
 
         {isHovered && !isSelected && (
