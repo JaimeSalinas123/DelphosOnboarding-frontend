@@ -67,12 +67,16 @@ export const authService = {
     const response = await postJson('/login', { email, password });
     const data = await handleResponse(response);
     
-    // Si el login es exitoso, guardamos el token y el perfil localmente
+    // Si el login es exitoso, guardamos el token y el perfil localmente.
+    // El backend no incluye el email dentro de "usuario", así que lo agregamos
+    // nosotros con el email usado para iniciar sesión (ya validado por el backend).
     if (data && data.token) {
+      const usuarioConEmail = { ...data.usuario, email: data.usuario?.email || email };
+      data.usuario = usuarioConEmail;
       localStorage.setItem('delphos_token', data.token);
-      localStorage.setItem('delphos_user', JSON.stringify(data.usuario));
+      localStorage.setItem('delphos_user', JSON.stringify(usuarioConEmail));
     }
-    
+
     return data;
   },
 
@@ -97,6 +101,16 @@ export const authService = {
     return null;
   },
 
+  // Función para actualizar los datos locales del usuario
+  updateCurrentUser: (newData: any) => {
+    if (typeof window !== 'undefined') {
+      const current = authService.getCurrentUser();
+      if (current) {
+        localStorage.setItem('delphos_user', JSON.stringify({ ...current, ...newData }));
+      }
+    }
+  },
+
   // Función para obtener el token de seguridad para futuras peticiones
   getToken: () => {
     if (typeof window !== 'undefined') {
@@ -106,16 +120,38 @@ export const authService = {
   },
 
   // --- NUEVAS FUNCIONES DE RECUPERACIÓN DE CONTRASEÑA ---
-
-  // Función para solicitar el correo de recuperación
   recuperarPassword: async (email: string) => {
     const response = await postJson('/recuperar-password', { email });
     return handleResponse(response);
   },
 
-  // Función para enviar la nueva contraseña junto con los tokens de seguridad
   resetearPassword: async (access_token: string, refresh_token: string, new_password: string) => {
     const response = await postJson('/resetear-password', { access_token, refresh_token, new_password });
     return handleResponse(response);
+  },
+
+  // --- FUNCIÓN PARA EL ONBOARDING ---
+  completarPrimerIngreso: async (email: string) => {
+    const response = await postJson('/completar-onboarding', { email });
+    const data = await handleResponse(response);
+
+    // Actualizamos el storage local para que no vuelva a salir la animación si recarga la página
+    authService.updateCurrentUser({ primer_ingreso: false });
+
+    return data;
+  },
+
+  // --- CONTROL DE LA BIENVENIDA (100% local, no depende del backend) ---
+  // Se guarda por email para que, en un dispositivo compartido, cada cuenta
+  // vea su propia animación de bienvenida una única vez.
+  haVistoBienvenida: (email: string) => {
+    if (typeof window === 'undefined' || !email) return true;
+    return localStorage.getItem(`delphos_bienvenida_${email}`) === 'true';
+  },
+
+  marcarBienvenidaVista: (email: string) => {
+    if (typeof window !== 'undefined' && email) {
+      localStorage.setItem(`delphos_bienvenida_${email}`, 'true');
+    }
   }
 };

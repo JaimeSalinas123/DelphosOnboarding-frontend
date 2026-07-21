@@ -10,25 +10,43 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isRegistro = pathname?.startsWith('/registro') ?? false;
 
   // Copy contextual del panel de marca.
   // Única fuente de esta información: no se repite dentro de la tarjeta del formulario.
-  const panel = isRegistro
-    ? {
-        titulo: 'Únete al equipo',
-        texto: 'Registra tus datos para entrar al ecosistema Delphos.',
-        pregunta: '¿Ya tienes una cuenta?',
-        cta: 'Iniciar sesión',
-        href: '/login',
-      }
-    : {
-        titulo: 'Bienvenido de vuelta',
-        texto: 'Ingresa con tu correo institucional para continuar.',
-        pregunta: '¿Eres un nuevo integrante?',
-        cta: 'Crear cuenta',
-        href: '/registro',
-      };
+  let panel;
+  if (pathname?.startsWith('/registro')) {
+    panel = {
+      titulo: 'Únete al equipo',
+      texto: 'Registra tus datos para entrar al ecosistema Delphos.',
+      pregunta: '¿Ya tienes una cuenta?',
+      cta: 'Iniciar sesión',
+      href: '/login',
+    };
+  } else if (pathname?.startsWith('/recuperar-password')) {
+    panel = {
+      titulo: 'Recupera tu acceso',
+      texto: 'Te enviaremos un enlace seguro a tu correo institucional para restablecer tu contraseña.',
+      pregunta: '¿Ya recordaste tu contraseña?',
+      cta: 'Iniciar sesión',
+      href: '/login',
+    };
+  } else if (pathname?.startsWith('/resetear-password')) {
+    panel = {
+      titulo: 'Crea una nueva contraseña',
+      texto: 'Define una contraseña nueva y segura para volver a entrar al ecosistema Delphos.',
+      pregunta: '¿Recordaste tu contraseña anterior?',
+      cta: 'Iniciar sesión',
+      href: '/login',
+    };
+  } else {
+    panel = {
+      titulo: 'Bienvenido de vuelta',
+      texto: 'Ingresa con tu correo institucional para continuar.',
+      pregunta: '¿Eres un nuevo integrante?',
+      cta: 'Crear cuenta',
+      href: '/registro',
+    };
+  }
 
   return (
     <div className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-neutral-secondary p-4 sm:p-6">
