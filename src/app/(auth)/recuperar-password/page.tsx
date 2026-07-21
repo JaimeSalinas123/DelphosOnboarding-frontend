@@ -34,61 +34,82 @@ export default function RecuperarPasswordPage() {
     }
   };
 
-  return (
-    <div>
-      <h3 className="text-2xl font-bold text-slate-900 text-center mb-6">
-        Recuperar Contraseña
-      </h3>
+  // --- Clases compartidas (mismo lenguaje visual que /login y /registro) ---
+  const inputClass =
+    'block w-full rounded-lg border border-default bg-neutral-primary px-3.5 py-2.5 text-sm text-heading placeholder:text-body/40 outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 disabled:opacity-60';
 
+  return (
+    <div className="w-full">
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-4 rounded shadow-sm text-sm text-red-800">
-          <strong>Error:</strong> {error}
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+          {error}
         </div>
       )}
-      
+
       {success ? (
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded shadow-sm text-sm text-green-800 text-center">
-          <p className="font-semibold mb-2">¡Correo enviado!</p>
-          <p>Si el correo existe en nuestro sistema, recibirás un enlace seguro para crear tu nueva contraseña.</p>
-          <Link href="/login" className="mt-4 inline-block font-medium text-blue-600 hover:text-blue-500">
+        <div className="rounded-lg border border-brand-orange/30 bg-brand-orange/5 px-3.5 py-2.5 text-sm text-heading">
+          <p className="mb-2 font-semibold">¡Correo enviado!</p>
+          <p className="text-body">
+            Si el correo existe en nuestro sistema, recibirás un enlace seguro para crear tu nueva contraseña.
+          </p>
+          <Link
+            href="/login"
+            className="mt-3 inline-block text-sm font-medium text-brand-orange transition-opacity hover:opacity-70"
+          >
             Volver al inicio de sesión
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-          <p className="text-sm text-slate-600 text-center">
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <p className="text-sm text-body">
             Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu acceso.
           </p>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">
-              Correo Electrónico
-            </label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-900"
-              placeholder="tu@correo.com"
-              required
-            />
-          </div>
+          <fieldset disabled={isLoading} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-body">
+                Correo electrónico
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+                placeholder="tu@correo.com"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                required
+              />
+            </div>
 
-          <button 
-            type="submit" 
-            disabled={isLoading}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white transition-colors ${
-              isLoading ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {isLoading ? 'Enviando...' : 'Enviar enlace seguro'}
-          </button>
+            <button
+              type="submit"
+              className={`mt-2 flex h-11 w-full items-center justify-center rounded-lg text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-brand-orange/40 focus:ring-offset-2 ${
+                isLoading
+                  ? 'cursor-not-allowed bg-neutral-tertiary'
+                  : 'bg-brand-orange hover:opacity-90'
+              }`}
+            >
+              {isLoading ? (
+                <>
+                  <svg className="-ml-1 mr-2.5 h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Enviando...
+                </>
+              ) : (
+                'Enviar enlace seguro'
+              )}
+            </button>
+          </fieldset>
         </form>
       )}
 
       {!success && (
-        <div className="mt-6 text-center text-sm text-slate-600">
-          <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+        <div className="mt-6 text-center text-sm text-body">
+          <Link href="/login" className="font-medium text-brand-orange transition-opacity hover:opacity-70">
             Cancelar y volver
           </Link>
         </div>

@@ -76,9 +76,32 @@ body {
   }
 }
 
+/* --- Pantalla de bienvenida (primer ingreso) --- */
+
+@keyframes blob-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.08);
+  }
+}
+
+.animate-blob-float {
+  animation: blob-float 10s ease-in-out infinite;
+}
+
+.animate-blob-float-delayed {
+  animation: blob-float 12s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-invite,
-  .animate-loaderPulse {
+  .animate-loaderPulse,
+  .animate-blob-float,
+  .animate-blob-float-delayed {
     animation: none !important;
   }
 }
