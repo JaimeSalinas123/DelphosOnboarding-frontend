@@ -14,7 +14,7 @@ export default function EstadoVacio() {
       className="pointer-events-none absolute inset-x-0 bottom-8 z-10 flex flex-col items-center text-center"
     >
       <div className="flex items-center gap-2 text-slate-500">
-        <span className="h-2 w-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-cyan-500 animate-invite" />
+        <span className="h-2 w-2 rounded-full bg-brand-orange animate-invite" />
         <p className="text-sm font-medium tracking-wide">
           Selecciona un módulo para explorarlo
         </p>

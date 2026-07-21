@@ -13,6 +13,9 @@ interface CirculoVirtuosoProps {
 }
 
 const RADIUS = 3.2;
+// El aro conector es un poco más chico que el radio de los nodos: así pasa
+// por detrás de cada uno en vez de coincidir exactamente con su borde.
+const RING_RADIUS = RADIUS - 0.18;
 const FRONT_ANGLE = Math.PI / 2;
 
 export default function CirculoVirtuoso({
@@ -23,13 +26,14 @@ export default function CirculoVirtuoso({
 
   const selectedId = useEcosistemaStore((s) => s.selectedId);
   const userInteracting = useEcosistemaStore((s) => s.userInteracting);
+  const hoveredId = useEcosistemaStore((s) => s.hoveredId);
 
   useEffect(() => {
     if (!selectedId) return;
     const mod = modulos.find((m) => m.id === selectedId);
     if (!mod) return;
     const current = targetRotation.current;
-    const desired = FRONT_ANGLE - mod.angulo;
+    const desired = mod.angulo - FRONT_ANGLE;
     const TAU = Math.PI * 2;
     let delta = (((desired - current) % TAU) + TAU) % TAU;
     if (delta > Math.PI) delta -= TAU;
@@ -47,7 +51,7 @@ export default function CirculoVirtuoso({
         6.3,
         delta
       );
-    } else if (!reducedMotion && !userInteracting) {
+    } else if (!reducedMotion && !userInteracting && !hoveredId) {
       ring.rotation.y += delta * 0.2;
       targetRotation.current = ring.rotation.y;
     }
@@ -55,7 +59,7 @@ export default function CirculoVirtuoso({
 
   return (
     <group ref={ringRef}>
-      <ConexionAnillo radius={RADIUS} reducedMotion={reducedMotion} />
+      <ConexionAnillo radius={RING_RADIUS} reducedMotion={reducedMotion} />
       {modulos.map((modulo, i) => (
         <NodoModulo
           key={modulo.id}

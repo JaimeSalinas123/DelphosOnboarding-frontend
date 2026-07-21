@@ -6,6 +6,7 @@ import { Billboard, Html, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Modulo } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { BRAND_ORANGE } from '@/lib/theme';
 
 interface NodoModuloProps {
   modulo: Modulo;
@@ -49,7 +50,8 @@ export default function NodoModulo({
   const anySelected = selectedId !== null;
   const isDimmed = anySelected && !isSelected;
 
-  const color = useMemo(() => new THREE.Color(modulo.color), [modulo.color]);
+  // Acento unificado: al pasar el mouse o seleccionar, siempre naranja de marca.
+  const color = useMemo(() => new THREE.Color(BRAND_ORANGE), []);
 
   const position = useMemo<[number, number, number]>(
     () => [
@@ -83,7 +85,7 @@ export default function NodoModulo({
 
     if (ringRef.current && ringMatRef.current) {
       if (!reducedMotion) ringRef.current.rotation.z += delta * 1.4;
-      const ro = isActive ? 1 : isDimmed ? 0.15 : 0.55;
+      const ro = isActive ? 1 : isDimmed ? 0.15 : 0.9;
       ringMatRef.current.opacity = THREE.MathUtils.damp(
         ringMatRef.current.opacity,
         ro,
@@ -93,12 +95,14 @@ export default function NodoModulo({
     }
 
     if (glowRef.current && glowMatRef.current) {
-      const pulse = reducedMotion ? 1 : 1 + Math.sin(t * 4 + phase) * 0.06;
-      const gTarget = isSelected ? 1.5 * pulse : isHovered ? 1.2 : 0.0001;
+      // El aura solo aparece en hover puro; se apaga al seleccionar.
+      const hoverOnly = isHovered && !isSelected;
+      const pulse = reducedMotion ? 1 : 1 + Math.sin(t * 4 + phase) * 0.04;
+      const gTarget = hoverOnly ? 1.05 * pulse : 0.0001;
       glowRef.current.scale.setScalar(
         THREE.MathUtils.damp(glowRef.current.scale.x, gTarget, 9.75, delta)
       );
-      const go = isActive ? 0.6 : 0;
+      const go = hoverOnly ? 0.6 : 0;
       glowMatRef.current.opacity = THREE.MathUtils.damp(
         glowMatRef.current.opacity,
         go,
@@ -157,7 +161,7 @@ export default function NodoModulo({
               ref={ringMatRef}
               color={color}
               transparent
-              opacity={0.55}
+              opacity={0.9}
               side={THREE.DoubleSide}
               toneMapped={false}
             />
@@ -166,9 +170,9 @@ export default function NodoModulo({
           <mesh onPointerOver={over} onPointerOut={out} onClick={click}>
             <circleGeometry args={[R, 64]} />
             <meshStandardMaterial
-              color="#FFFFFF"
-              metalness={0.1}
-              roughness={0.55}
+              color="#171717"
+              metalness={0.25}
+              roughness={0.45}
             />
           </mesh>
 
@@ -193,7 +197,7 @@ export default function NodoModulo({
           >
             <div
               className="whitespace-nowrap rounded-full px-3 py-1 text-[13px] font-medium text-white shadow-md"
-              style={{ backgroundColor: modulo.color }}
+              style={{ backgroundColor: BRAND_ORANGE }}
             >
               {modulo.nombre}
             </div>

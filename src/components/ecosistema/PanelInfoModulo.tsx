@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import { getModuloById } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { BRAND_ORANGE, BRAND_BLACK, hexToRgba } from '@/lib/theme';
 
 const container = {
   hidden: { opacity: 0, x: 60, scale: 0.96 },
@@ -35,14 +36,6 @@ const item = {
   },
 };
 
-function hexToRgba(hex: string, a: number) {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.slice(0, 2), 16);
-  const g = parseInt(h.slice(2, 4), 16);
-  const b = parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${a})`;
-}
-
 export default function PanelInfoModulo() {
   const selectedId = useEcosistemaStore((s) => s.selectedId);
   const deselect = useEcosistemaStore((s) => s.deselect);
@@ -58,18 +51,19 @@ export default function PanelInfoModulo() {
           animate="visible"
           exit="exit"
           aria-live="polite"
-          className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 md:inset-x-auto md:inset-y-0 md:right-0 md:flex md:items-center md:pr-5"
+          className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 md:inset-x-auto md:inset-y-0 md:right-0 md:flex md:items-center md:pr-6"
         >
           <div
-            className="deinsa-scroll max-h-[64vh] overflow-y-auto rounded-t-3xl border bg-white/85 p-6 shadow-2xl backdrop-blur-xl md:max-h-[86vh] md:w-[380px] md:rounded-3xl md:p-7"
+            className="deinsa-scroll max-h-[72vh] overflow-y-auto rounded-t-3xl border p-7 shadow-2xl backdrop-blur-xl md:max-h-[88vh] md:w-[460px] md:rounded-3xl md:p-9"
             style={{
-              borderColor: hexToRgba(modulo.color, 0.35),
-              boxShadow: `0 24px 60px -20px ${hexToRgba(modulo.color, 0.5)}`,
+              backgroundColor: hexToRgba(BRAND_BLACK, 0.94),
+              borderColor: hexToRgba(BRAND_ORANGE, 0.4),
+              boxShadow: `0 24px 60px -20px ${hexToRgba(BRAND_ORANGE, 0.55)}`,
             }}
             role="region"
             aria-label={`Información del módulo ${modulo.nombre}`}
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200 md:hidden" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 md:hidden" />
 
             <AnimatePresence mode="wait">
               <motion.div
@@ -81,25 +75,25 @@ export default function PanelInfoModulo() {
               >
                 <motion.div
                   variants={item}
-                  className="mb-4 flex items-center gap-3"
+                  className="mb-5 flex items-center gap-3.5"
                 >
                   <div
-                    className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: hexToRgba(modulo.color, 0.12) }}
+                    className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: hexToRgba(BRAND_ORANGE, 0.16) }}
                   >
                     <Image
                       src={`/logos/${modulo.logo}`}
                       alt={modulo.nombre}
-                      width={44}
-                      height={44}
+                      width={50}
+                      height={50}
                       style={{ objectFit: 'contain' }}
                     />
                   </div>
                   <span
                     className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-widest"
                     style={{
-                      backgroundColor: hexToRgba(modulo.color, 0.14),
-                      color: modulo.color,
+                      backgroundColor: hexToRgba(BRAND_ORANGE, 0.18),
+                      color: BRAND_ORANGE,
                     }}
                   >
                     Módulo
@@ -108,37 +102,37 @@ export default function PanelInfoModulo() {
 
                 <motion.h2
                   variants={item}
-                  className="text-2xl font-semibold leading-tight text-slate-900"
+                  className="text-3xl font-semibold leading-tight text-white"
                 >
                   {modulo.nombre}
                 </motion.h2>
 
                 <motion.p
                   variants={item}
-                  className="mt-1.5 text-sm font-semibold"
-                  style={{ color: modulo.color }}
+                  className="mt-2 text-base font-semibold"
+                  style={{ color: BRAND_ORANGE }}
                 >
                   {modulo.tagline}
                 </motion.p>
 
                 <motion.p
                   variants={item}
-                  className="mt-4 text-sm leading-relaxed text-slate-600"
+                  className="mt-4 text-[15px] leading-relaxed text-white/70"
                 >
                   {modulo.descripcion}
                 </motion.p>
 
-                <motion.div variants={item} className="mt-6">
-                  <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                <motion.div variants={item} className="mt-7">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/40">
                     Capacidades clave
                   </h3>
-                  <ul className="flex flex-wrap gap-2">
+                  <ul className="flex flex-wrap gap-2.5">
                     {modulo.capacidades.map((cap) => (
                       <li
                         key={cap}
-                        className="rounded-full px-3 py-1.5 text-[13px] font-medium text-slate-700"
+                        className="rounded-full px-3.5 py-2 text-sm font-medium text-white/90"
                         style={{
-                          backgroundColor: hexToRgba(modulo.color, 0.1),
+                          backgroundColor: hexToRgba(BRAND_ORANGE, 0.16),
                         }}
                       >
                         {cap}
@@ -149,19 +143,19 @@ export default function PanelInfoModulo() {
 
                 <motion.div
                   variants={item}
-                  className="mt-6 rounded-r-xl py-3 pl-4 pr-3"
+                  className="mt-7 rounded-r-xl py-4 pl-5 pr-4"
                   style={{
-                    borderLeft: `3px solid ${modulo.color}`,
-                    backgroundColor: hexToRgba(modulo.color, 0.07),
+                    borderLeft: `3px solid ${BRAND_ORANGE}`,
+                    backgroundColor: hexToRgba(BRAND_ORANGE, 0.12),
                   }}
                 >
                   <h3
-                    className="mb-1 text-[11px] font-semibold uppercase tracking-widest"
-                    style={{ color: modulo.color }}
+                    className="mb-1.5 text-xs font-semibold uppercase tracking-widest"
+                    style={{ color: BRAND_ORANGE }}
                   >
                     Diferencial
                   </h3>
-                  <p className="text-sm leading-relaxed text-slate-700">
+                  <p className="text-[15px] leading-relaxed text-white/80">
                     {modulo.diferencial}
                   </p>
                 </motion.div>
@@ -171,7 +165,7 @@ export default function PanelInfoModulo() {
             <button
               type="button"
               onClick={deselect}
-              className="mt-6 w-full rounded-xl border border-slate-200 py-2 text-xs font-medium uppercase tracking-widest text-slate-500 transition-colors hover:bg-slate-50"
+              className="mt-7 w-full rounded-xl border border-white/15 py-2.5 text-xs font-medium uppercase tracking-widest text-white/60 transition-colors hover:bg-white/10"
               aria-label="Cerrar panel y volver al ecosistema"
             >
               Volver al ecosistema
