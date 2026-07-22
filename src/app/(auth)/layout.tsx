@@ -49,8 +49,8 @@ export default function AuthLayout({
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-neutral-secondary p-4 sm:p-6">
-      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-default bg-neutral-primary lg:min-h-[38rem] lg:grid-cols-2">
+    <div className="flex min-h-[100dvh] items-center justify-center overflow-hidden bg-neutral-primary p-4 sm:p-6">
+      <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border-2 border-brand-orange bg-neutral-primary lg:min-h-[38rem] lg:grid-cols-2">
 
         {/* Panel de marca — arriba en móvil, a la derecha en escritorio */}
         <aside className="flex flex-col items-center justify-center gap-4 bg-brand-black px-8 py-10 text-center lg:order-2 lg:rounded-l-[2.5rem] lg:px-12 lg:py-14">
