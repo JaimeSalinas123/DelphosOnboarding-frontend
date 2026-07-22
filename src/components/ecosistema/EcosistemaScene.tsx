@@ -58,6 +58,54 @@ function SceneRig({
   return <group ref={groupRef}>{children}</group>;
 }
 
+const BASE_FOV = 42;
+const BASE_DISTANCE = 10.5;
+const BASE_ELEVATION_RATIO = 2.9 / 10.5;
+// Ancho de mundo que necesitamos ver horizontalmente para que el anillo
+// (radio 3.2, con nodos y glow hasta ~3.65) no quede recortado por los
+// costados en pantallas angostas (celulares en vertical).
+const TARGET_HALF_WIDTH = 4.2;
+
+/**
+ * Ajusta FOV y distancia de la cámara según el aspect ratio real del
+ * viewport (no un breakpoint fijo), para que el anillo entre completo tanto
+ * en pantallas anchas como angostas, incluida rotación de pantalla en vivo.
+ * En pantallas anchas se comporta igual que antes (FOV/distancia base).
+ */
+function CamaraResponsiva() {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    const persp = camera as THREE.PerspectiveCamera;
+    const aspect = size.width / size.height;
+
+    if (aspect >= 1) {
+      persp.fov = BASE_FOV;
+      persp.position.z = BASE_DISTANCE;
+      persp.position.y = BASE_DISTANCE * BASE_ELEVATION_RATIO;
+    } else {
+      const fovDeg = THREE.MathUtils.clamp(
+        BASE_FOV + (1 - aspect) * 24,
+        BASE_FOV,
+        62
+      );
+      const fovRad = THREE.MathUtils.degToRad(fovDeg);
+      const distance = THREE.MathUtils.clamp(
+        TARGET_HALF_WIDTH / (aspect * Math.tan(fovRad / 2)),
+        BASE_DISTANCE,
+        22
+      );
+      persp.fov = fovDeg;
+      persp.position.z = distance;
+      persp.position.y = distance * BASE_ELEVATION_RATIO;
+    }
+
+    persp.updateProjectionMatrix();
+  }, [camera, size]);
+
+  return null;
+}
+
 const PARTICLE_COUNT = 160;
 // Punto aproximado donde termina el nodo seleccionado en pantalla (dado el
 // desplazamiento a la izquierda de SceneRig + la rotación al frente del
@@ -202,6 +250,7 @@ export default function EcosistemaScene({
       {/* Sin fondo propio: deja ver el fondo CSS (FondoEcosistema) detrás del
           canvas transparente. Ya no hay ContactShadows ni otro plano opaco
           que pudiera quedar expuesto por esto. */}
+      <CamaraResponsiva />
 
       {/* Iluminación de estudio (brillante, funciona igual sobre el fondo claro) */}
       <ambientLight intensity={0.9} />

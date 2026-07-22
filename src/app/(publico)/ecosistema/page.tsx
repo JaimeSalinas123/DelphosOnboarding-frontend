@@ -8,6 +8,7 @@ import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
 import PanelInfoModulo from '@/components/ecosistema/PanelInfoModulo';
 import EstadoVacio from '@/components/ecosistema/EstadoVacio';
 import FondoEcosistema from '@/components/ecosistema/FondoEcosistema';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 
 const EcosistemaScene = dynamic(
   () => import('@/components/ecosistema/EcosistemaScene'),
@@ -75,19 +76,6 @@ function useLowPower() {
   return low;
 }
 
-/** true en viewports md+ (el panel de info es una barra lateral, no un bottom sheet). */
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    setIsDesktop(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-  return isDesktop;
-}
-
 export default function EcosistemaPage() {
   const reducedMotion = usePrefersReducedMotion();
   const lowPower = useLowPower();
@@ -139,19 +127,19 @@ export default function EcosistemaPage() {
     <main className="relative w-full flex-1 overflow-hidden bg-white">
       <FondoEcosistema />
 
-      <header className="pointer-events-none absolute left-0 top-0 z-10 p-5 md:p-7">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-400">
+      <header className="pointer-events-none absolute left-0 top-0 z-10 max-w-[80vw] p-4 sm:p-5 md:p-7">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400 sm:text-[11px] sm:tracking-[0.35em]">
           DEINSA Global
         </p>
-        <h1 className="mt-1 text-sm font-semibold tracking-wide text-slate-800">
+        <h1 className="mt-1 text-xs font-semibold tracking-wide text-slate-800 sm:text-sm">
           Ecosistema Delphos
-          <span className="ml-2 font-normal text-slate-400">
+          <span className="ml-2 hidden font-normal text-slate-400 sm:inline">
             · Círculo Virtuoso
           </span>
         </h1>
 
         <div className="mt-3 flex items-center gap-2">
-          <div className="h-1 w-24 overflow-hidden rounded-full bg-slate-900/10">
+          <div className="h-1 w-16 overflow-hidden rounded-full bg-slate-900/10 sm:w-24">
             <div
               className="h-full rounded-full bg-brand-orange transition-[width] duration-500 ease-out"
               style={{
@@ -159,7 +147,7 @@ export default function EcosistemaPage() {
               }}
             />
           </div>
-          <p className="text-[11px] font-medium tabular-nums text-slate-400">
+          <p className="text-[10px] font-medium tabular-nums text-slate-400 sm:text-[11px]">
             {visitedIds.length}/{modulos.length} explorados
           </p>
         </div>

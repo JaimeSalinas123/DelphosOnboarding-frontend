@@ -4,15 +4,17 @@ import Image from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getModuloById } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { BRAND_ORANGE, hexToRgba } from '@/lib/theme';
 
-// Punto aproximado (en % de la vista) donde termina el nodo seleccionado,
-// dado el desplazamiento a la izquierda del anillo. El spotlight, la ola de
-// revelado y la silueta del ícono se anclan todos ahí para sentirse
-// conectados con el nodo, sin necesitar proyección 3D→2D en tiempo real.
-const SPOT_X = '36%';
-const SPOT_Y = '56%';
-const SPOT_ORIGIN = `${SPOT_X} ${SPOT_Y}`;
+// Punto aproximado (en % de la vista) donde termina el nodo seleccionado. En
+// desktop el anillo se desplaza a la izquierda (deja aire a la tarjeta), así
+// que el spotlight se ancla ahí; en mobile el anillo casi no se mueve
+// (la tarjeta es un bottom sheet, no compite por ancho), así que se ancla
+// al centro. El spotlight, la ola de revelado y la silueta del ícono se
+// anclan todos al mismo punto, sin necesitar proyección 3D→2D en tiempo real.
+const SPOT_DESKTOP = { x: '36%', y: '56%' };
+const SPOT_MOBILE = { x: '50%', y: '46%' };
 
 const GRADIENTE_IDLE =
   'linear-gradient(180deg, #fbfbfa 0%, #ffffff 55%, #fdf6f3 100%)';
@@ -32,6 +34,11 @@ const NOISE_URL =
 export default function FondoEcosistema() {
   const selectedId = useEcosistemaStore((s) => s.selectedId);
   const modulo = getModuloById(selectedId);
+  const isDesktop = useIsDesktop();
+
+  const spot = isDesktop ? SPOT_DESKTOP : SPOT_MOBILE;
+  const SPOT_ORIGIN = `${spot.x} ${spot.y}`;
+  const siluetaSize = isDesktop ? 640 : 380;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
@@ -70,8 +77,14 @@ export default function FondoEcosistema() {
         {modulo && (
           <motion.div
             key={modulo.id}
-            className="absolute h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2"
-            style={{ left: SPOT_X, top: SPOT_Y, filter: 'blur(70px)' }}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{
+              left: spot.x,
+              top: spot.y,
+              width: siluetaSize,
+              height: siluetaSize,
+              filter: `blur(${isDesktop ? 70 : 42}px)`,
+            }}
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 0.18, scale: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.4 } }}
