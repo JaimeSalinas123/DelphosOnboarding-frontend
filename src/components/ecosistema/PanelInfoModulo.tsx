@@ -54,7 +54,7 @@ export default function PanelInfoModulo() {
           className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 md:inset-x-auto md:inset-y-0 md:right-0 md:flex md:items-center md:pr-16"
         >
           <div
-            className="deinsa-scroll max-h-[75vh] overflow-y-auto rounded-t-3xl border p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl sm:p-7 md:max-h-[88vh] md:w-[460px] md:rounded-3xl md:p-9 md:pb-9"
+            className="deinsa-scroll max-h-[75vh] overflow-y-auto rounded-t-3xl border p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl sm:p-7 md:max-h-[78vh] md:w-[600px] md:rounded-3xl md:p-9 md:pb-9"
             style={{
               backgroundColor: hexToRgba(BRAND_BLACK, 0.94),
               borderColor: hexToRgba(BRAND_ORANGE, 0.4),
@@ -125,17 +125,18 @@ export default function PanelInfoModulo() {
 
                 <motion.div variants={item} className="mt-6 sm:mt-7">
                   <h3 className="mb-2.5 text-xs font-semibold uppercase tracking-widest text-white/40 sm:mb-3">
-                    Capacidades clave
+                    Funciones destacadas
                   </h3>
-                  <ul className="flex flex-wrap gap-2 sm:gap-2.5">
+                  <ul className="space-y-2 sm:space-y-2.5">
                     {modulo.capacidades.map((cap) => (
                       <li
                         key={cap}
-                        className="rounded-full px-3 py-1.5 text-[13px] font-medium text-white/90 sm:px-3.5 sm:py-2 sm:text-sm"
-                        style={{
-                          backgroundColor: hexToRgba(BRAND_ORANGE, 0.16),
-                        }}
+                        className="flex items-start gap-2.5 text-sm leading-relaxed text-white/85 sm:text-[15px]"
                       >
+                        <span
+                          className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                          style={{ backgroundColor: BRAND_ORANGE }}
+                        />
                         {cap}
                       </li>
                     ))}
