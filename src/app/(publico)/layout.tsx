@@ -26,9 +26,15 @@ export default function PublicoLayout({
   // Esto evita que veas la página por un microsegundo y luego te parpadee al redirigir.
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-primary">
-        <div className="w-10 h-10 border-4 border-brand-orange border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-brand-gray text-sm font-medium">Verificando entorno seguro...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        {/* Loader optimizado: Doble anillo con opacidades para un efecto más corporativo */}
+        <div className="relative flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-brand-orange/20 border-t-brand-orange rounded-full animate-spin"></div>
+          <div className="absolute w-6 h-6 bg-brand-orange/10 rounded-full animate-pulse"></div>
+        </div>
+        <p className="mt-5 text-gray-500 text-sm font-medium tracking-widest uppercase animate-pulse">
+          Verificando entorno...
+        </p>
       </div>
     );
   }
@@ -43,12 +49,18 @@ export default function PublicoLayout({
   // CASO 3: Tienes credenciales válidas.
   // Te mostramos el Navbar y la sección a la que querías entrar (Ecosistema u Onboarding).
   return (
-    <>
+    // Agregamos min-h-screen al contenedor principal para evitar espacios en blanco debajo
+    <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
-      {/* pt-16 empuja el contenido hacia abajo para que el Navbar fijo no lo tape */}
-      <div className="flex flex-1 flex-col pt-16">
+      
+      {/* 
+        1. Cambiamos <div> por <main> por buenas prácticas de semántica web y SEO.
+        2. Usamos pt-[68px] exactos, ya que esa es la altura real de tu Navbar en CSS, 
+           evitando que el contenido quede montado o muy despegado. 
+      */}
+      <main className="flex flex-1 flex-col pt-[68px]">
         {children}
-      </div>
-    </>
+      </main>
+    </div>
   );
 }
