@@ -3,12 +3,13 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext'; // <-- Ruta corregida
-import { isValidEmail, sanitizeInput } from '@/utils/validation'; // <-- Ruta corregida
+import { useAuth } from '@/context/AuthContext';
+import { isValidEmail, sanitizeInput } from '@/utils/validation';
+import { authService } from '@/services/authService'; // <-- Agregado para leer el rol tras el login
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth(); // <-- Conectamos al estado global
+  const { login } = useAuth(); 
 
   // Estados del formulario
   const [email, setEmail] = useState('');
@@ -69,8 +70,16 @@ export default function LoginPage() {
       setPassword('');
 
       setTimeout(() => {
-        // Redirigir a la nueva página de onboarding
-        router.push('/onboarding');
+        // Leemos el usuario que se acaba de guardar en memoria tras el login exitoso
+        const currentUser = authService.getCurrentUser();
+
+        // REDIRECCIÓN INTELIGENTE BASADA EN ROLES
+        if (currentUser?.rol === 'administrador' || currentUser?.rol === 'evaluador') {
+          // Asegúrate de crear esta página cuando construyas el panel
+          router.push('/dashboard-ch'); 
+        } else {
+          router.push('/onboarding');
+        }
       }, 1500);
 
     } catch (err: any) {
