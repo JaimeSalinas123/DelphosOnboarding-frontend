@@ -4,8 +4,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 
+/**
+ * Perfil del usuario autenticado. `rol` se deja como `string` (no un union
+ * estricto) porque el backend es la fuente de verdad: agregar un rol nuevo
+ * ahí no debe romper el build del frontend. Los componentes que necesiten
+ * restringir por rol deben comparar contra una lista explícita (ver
+ * `ROLES_CON_ACCESO` en `(privado)/layout.tsx`), no confiar en el tipo.
+ */
+export interface Usuario {
+  nombre: string;
+  email: string;
+  rol: string;
+  departamento?: string;
+  primer_ingreso?: boolean;
+}
+
 interface AuthContextType {
-  user: any | null;
+  user: Usuario | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -15,7 +30,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<Usuario | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

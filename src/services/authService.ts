@@ -1,7 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 // Tiempo máximo de espera para evitar solicitudes colgadas indefinidamente.
-const REQUEST_TIMEOUT_MS = 15000;
+export const REQUEST_TIMEOUT_MS = 15000;
 
 const postJson = async (path: string, body: unknown) => {
   const controller = new AbortController();
@@ -27,7 +27,7 @@ const postJson = async (path: string, body: unknown) => {
   }
 };
 
-const handleResponse = async (response: Response) => {
+export const handleResponse = async (response: Response) => {
   const textBody = await response.text();
   
   let data;
