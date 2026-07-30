@@ -1,13 +1,78 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usuarioService, type UsuarioListado } from '@/services/usuarioService';
+import { useAuth } from '@/context/AuthContext';
+import {
+  usuarioService,
+  type RolEditable,
+  type UsuarioListado,
+} from '@/services/usuarioService';
 import { etiquetaRol } from '@/lib/roles';
 
+/** Roles que el toggle de la tabla entiende; todo lo demás (ej. 'evaluador') se ve como badge fijo. */
+function esRolEditable(rol: string): rol is RolEditable {
+  return rol === 'nuevo_integrante' || rol === 'administrador';
+}
+
+function ToggleRol({
+  usuario,
+  cargando,
+  esUsuarioActual,
+  onCambiar,
+}: {
+  usuario: UsuarioListado;
+  cargando: boolean;
+  esUsuarioActual: boolean;
+  onCambiar: (nuevoRol: RolEditable) => void;
+}) {
+  const esAdmin = usuario.rol === 'administrador';
+  const deshabilitado = cargando || esUsuarioActual;
+
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={esAdmin}
+        aria-label={`Cambiar rol de ${usuario.nombre}`}
+        title={esUsuarioActual ? 'No podés cambiar tu propio rol' : undefined}
+        disabled={deshabilitado}
+        onClick={() => onCambiar(esAdmin ? 'nuevo_integrante' : 'administrador')}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40 ${
+          esAdmin ? 'bg-brand-orange' : 'bg-slate-300'
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            esAdmin ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
+      <span className="text-xs font-medium text-body">
+        {cargando
+          ? 'Actualizando…'
+          : esUsuarioActual
+            ? `${etiquetaRol(usuario.rol)} · tú`
+            : etiquetaRol(usuario.rol)}
+      </span>
+    </div>
+  );
+}
+
 export default function UsuariosPage() {
+  const { user: usuarioActual } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioListado[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actualizandoId, setActualizandoId] = useState<string | null>(null);
+  const [errorFila, setErrorFila] = useState<string | null>(null);
+
+  const puedeEditarRoles = usuarioActual?.rol === 'administrador';
+
+  const esUsuarioActual = (usuario: UsuarioListado) =>
+    !!usuarioActual &&
+    usuarioActual.email.toLowerCase() === usuario.email.toLowerCase();
 
   const cargar = () => {
     setCargando(true);
@@ -20,6 +85,34 @@ export default function UsuariosPage() {
   };
 
   useEffect(cargar, []);
+
+  const cambiarRol = async (usuario: UsuarioListado, nuevoRol: RolEditable) => {
+    // Defensa extra: aunque el switch ya viene deshabilitado para tu propia
+    // fila, no permitir el cambio si de alguna forma se llega a llamar igual.
+    if (esUsuarioActual(usuario)) return;
+
+    const rolAnterior = usuario.rol;
+    setActualizandoId(usuario.id);
+    setErrorFila(null);
+    // Optimista: refleja el cambio ya, y lo revierte si el backend lo rechaza.
+    setUsuarios((prev) =>
+      prev.map((u) => (u.id === usuario.id ? { ...u, rol: nuevoRol } : u))
+    );
+
+    try {
+      const actualizado = await usuarioService.actualizarRol(usuario.id, nuevoRol);
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === usuario.id ? actualizado : u))
+      );
+    } catch (err) {
+      setUsuarios((prev) =>
+        prev.map((u) => (u.id === usuario.id ? { ...u, rol: rolAnterior } : u))
+      );
+      setErrorFila((err as Error).message);
+    } finally {
+      setActualizandoId(null);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
@@ -36,6 +129,12 @@ export default function UsuariosPage() {
           </span>
         )}
       </header>
+
+      {errorFila && (
+        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+          No se pudo actualizar el rol: {errorFila}
+        </div>
+      )}
 
       <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
         {cargando ? (
@@ -84,9 +183,18 @@ export default function UsuariosPage() {
                     <td className="px-5 py-3 text-body">{usuario.email}</td>
                     <td className="px-5 py-3 text-body">{usuario.departamento || '—'}</td>
                     <td className="px-5 py-3">
-                      <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-2.5 py-1 text-xs font-medium text-brand-orange">
-                        {etiquetaRol(usuario.rol)}
-                      </span>
+                      {puedeEditarRoles && esRolEditable(usuario.rol) ? (
+                        <ToggleRol
+                          usuario={usuario}
+                          cargando={actualizandoId === usuario.id}
+                          esUsuarioActual={esUsuarioActual(usuario)}
+                          onCambiar={(nuevoRol) => cambiarRol(usuario, nuevoRol)}
+                        />
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-2.5 py-1 text-xs font-medium text-brand-orange">
+                          {etiquetaRol(usuario.rol)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

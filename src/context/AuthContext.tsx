@@ -12,6 +12,7 @@ import { authService } from '../services/authService';
  * `ROLES_CON_ACCESO` en `(privado)/layout.tsx`), no confiar en el tipo.
  */
 export interface Usuario {
+  id?: string;
   nombre: string;
   email: string;
   rol: string;
