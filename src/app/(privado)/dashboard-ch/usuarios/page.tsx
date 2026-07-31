@@ -8,6 +8,7 @@ import {
   type UsuarioListado,
 } from '@/services/usuarioService';
 import { etiquetaRol } from '@/lib/roles';
+import { DEPARTAMENTOS } from '@/lib/departamentos';
 
 /** Roles que el toggle de la tabla entiende; todo lo demás (ej. 'evaluador') se ve como badge fijo. */
 function esRolEditable(rol: string): rol is RolEditable {
@@ -60,6 +61,9 @@ function ToggleRol({
   );
 }
 
+const selectClass =
+  'rounded-lg border border-default bg-neutral-primary px-4 py-2.5 text-sm text-heading outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20';
+
 export default function UsuariosPage() {
   const { user: usuarioActual } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioListado[]>([]);
@@ -68,23 +72,53 @@ export default function UsuariosPage() {
   const [actualizandoId, setActualizandoId] = useState<string | null>(null);
   const [errorFila, setErrorFila] = useState<string | null>(null);
 
+  const [busqueda, setBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
+  const [departamentoFiltro, setDepartamentoFiltro] = useState('');
+  const [intentos, setIntentos] = useState(0);
+
   const puedeEditarRoles = usuarioActual?.rol === 'administrador';
+  const hayFiltrosActivos = !!busqueda || !!departamentoFiltro;
 
   const esUsuarioActual = (usuario: UsuarioListado) =>
     !!usuarioActual &&
     usuarioActual.email.toLowerCase() === usuario.email.toLowerCase();
 
-  const cargar = () => {
+  // Espera a que el usuario deje de tipear antes de pegarle al backend.
+  useEffect(() => {
+    const id = setTimeout(() => setBusquedaDebounced(busqueda.trim()), 400);
+    return () => clearTimeout(id);
+  }, [busqueda]);
+
+  // Recarga cuando cambia el filtro por departamento, la búsqueda (ya
+  // debounced) o cuando se pide reintentar tras un error.
+  useEffect(() => {
+    let cancelado = false;
     setCargando(true);
     setError(null);
     usuarioService
-      .listar()
-      .then(setUsuarios)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setCargando(false));
-  };
+      .listar({
+        nombre: busquedaDebounced || undefined,
+        departamento: departamentoFiltro || undefined,
+      })
+      .then((data) => {
+        if (!cancelado) setUsuarios(data);
+      })
+      .catch((err: Error) => {
+        if (!cancelado) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [busquedaDebounced, departamentoFiltro, intentos]);
 
-  useEffect(cargar, []);
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setDepartamentoFiltro('');
+  };
 
   const cambiarRol = async (usuario: UsuarioListado, nuevoRol: RolEditable) => {
     // Defensa extra: aunque el switch ya viene deshabilitado para tu propia
@@ -114,6 +148,13 @@ export default function UsuariosPage() {
     }
   };
 
+  // Administradores primero; dentro de cada grupo, orden alfabético por nombre.
+  const usuariosOrdenados = [...usuarios].sort((a, b) => {
+    const prioridad = (u: UsuarioListado) => (u.rol === 'administrador' ? 0 : 1);
+    const diff = prioridad(a) - prioridad(b);
+    return diff !== 0 ? diff : a.nombre.localeCompare(b.nombre, 'es');
+  });
+
   return (
     <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex items-center justify-between">
@@ -130,13 +171,44 @@ export default function UsuariosPage() {
         )}
       </header>
 
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre..."
+          className="flex-1 rounded-lg border border-default bg-neutral-primary px-4 py-2.5 text-sm text-heading placeholder:text-body/50 outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20"
+        />
+        <select
+          value={departamentoFiltro}
+          onChange={(e) => setDepartamentoFiltro(e.target.value)}
+          className={`${selectClass} sm:w-56`}
+        >
+          <option value="">Todos los departamentos</option>
+          {DEPARTAMENTOS.map((dep) => (
+            <option key={dep} value={dep}>
+              {dep}
+            </option>
+          ))}
+        </select>
+        {hayFiltrosActivos && (
+          <button
+            type="button"
+            onClick={limpiarFiltros}
+            className="text-xs font-medium text-brand-gray transition-colors hover:text-brand-orange"
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
       {errorFila && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
           No se pudo actualizar el rol: {errorFila}
         </div>
       )}
 
-      <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
+      <section className="mt-4 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
         {cargando ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -150,7 +222,7 @@ export default function UsuariosPage() {
             <p className="max-w-sm text-xs text-body">{error}</p>
             <button
               type="button"
-              onClick={cargar}
+              onClick={() => setIntentos((n) => n + 1)}
               className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
             >
               Reintentar
@@ -159,10 +231,14 @@ export default function UsuariosPage() {
         ) : usuarios.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-1 py-16 text-center">
             <p className="text-sm font-medium text-heading">
-              Todavía no hay usuarios registrados
+              {hayFiltrosActivos
+                ? 'Ningún usuario coincide con el filtro'
+                : 'Todavía no hay usuarios registrados'}
             </p>
             <p className="text-xs text-body">
-              Los nuevos registros van a aparecer acá.
+              {hayFiltrosActivos
+                ? 'Probá con otro nombre o departamento.'
+                : 'Los nuevos registros van a aparecer acá.'}
             </p>
           </div>
         ) : (
@@ -177,7 +253,7 @@ export default function UsuariosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-default">
-                {usuarios.map((usuario) => (
+                {usuariosOrdenados.map((usuario) => (
                   <tr key={usuario.id} className="transition-colors hover:bg-neutral-secondary/40">
                     <td className="px-5 py-3 font-medium text-heading">{usuario.nombre}</td>
                     <td className="px-5 py-3 text-body">{usuario.email}</td>

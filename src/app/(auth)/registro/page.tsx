@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 import { isValidEmail, isValidName, passwordContainsPersonalInfo, sanitizeInput } from '@/utils/validation';
+import { DEPARTAMENTOS } from '@/lib/departamentos';
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -195,10 +196,11 @@ export default function RegistroPage() {
               required
             >
               <option value="" disabled>Selecciona tu área...</option>
-              <option value="Capital Humano">Capital Humano</option>
-              <option value="La Plaza Digital">La Plaza Digital</option>
-              <option value="Relaciones Corporativas">Relaciones Corporativas</option>
-              <option value="Research & Development">Research &amp; Development</option>
+              {DEPARTAMENTOS.map((dep) => (
+                <option key={dep} value={dep}>
+                  {dep}
+                </option>
+              ))}
             </select>
           </div>
 

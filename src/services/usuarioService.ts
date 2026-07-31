@@ -41,11 +41,26 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   }
 }
 
+export interface FiltrosUsuarios {
+  /** Coincidencia exacta. */
+  departamento?: string;
+  /** Búsqueda parcial, insensible a mayúsculas (ilike en el backend). */
+  nombre?: string;
+}
+
 export const usuarioService = {
-  // Lista los usuarios registrados. Requiere sesión activa (endpoint protegido
-  // con verificarToken en el backend).
-  listar: async (): Promise<UsuarioListado[]> => {
-    const response = await authFetch('/usuarios', { method: 'GET' });
+  // Lista los usuarios registrados, con filtro opcional por departamento y
+  // búsqueda opcional por nombre (ambos resueltos en el backend). Requiere
+  // sesión activa (endpoint protegido con verificarToken).
+  listar: async (filtros: FiltrosUsuarios = {}): Promise<UsuarioListado[]> => {
+    const params = new URLSearchParams();
+    if (filtros.departamento) params.set('departamento', filtros.departamento);
+    if (filtros.nombre) params.set('nombre', filtros.nombre);
+    const query = params.toString();
+
+    const response = await authFetch(`/usuarios${query ? `?${query}` : ''}`, {
+      method: 'GET',
+    });
     const data = await handleResponse(response);
     return data?.usuarios ?? [];
   },
