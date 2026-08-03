@@ -9,13 +9,23 @@ import { authService } from "@/services/authService";
 type NavLink = {
   href: string;
   label: string;
+  subLinks?: { href: string; label: string }[];
 };
 
-// Dejamos solo los enlaces esenciales. Inicio ahora apunta a onboarding.
+// Se eliminó "Videos" del submenú de Estudio
 const NAV_LINKS: NavLink[] = [
   { href: "/onboarding", label: "Inicio" },
   { href: "/ecosistema", label: "Ecosistema" },
   { href: "/encuesta", label: "Encuesta" },
+  {
+    href: "/estudio",
+    label: "Estudio",
+    subLinks: [
+      { href: "/estudio/cuestionario", label: "Cuestionario" },
+      { href: "/estudio/flashcards", label: "FlashCards" },
+      { href: "/estudio/verdadero-falso", label: "Verdadero/Falso" },
+    ],
+  },
 ];
 
 const USER_MENU = [
@@ -29,27 +39,21 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
-  // Estado para las iniciales del usuario
   const [initials, setInitials] = useState("DO");
 
-  // Obtener el usuario actual y calcular sus iniciales
   useEffect(() => {
     const user = authService.getCurrentUser();
     if (user && user.nombre) {
-      // Limpiamos espacios extra y separamos por palabras
       const nameParts = user.nombre.trim().split(/\s+/);
       
       if (nameParts.length >= 2) {
-        // Toma la primera letra de la primera y segunda palabra (Ej: "Diego Bonilla" -> "DB")
         setInitials((nameParts[0][0] + nameParts[1][0]).toUpperCase());
       } else if (nameParts.length === 1) {
-        // Si por alguna razón solo puso un nombre, toma las dos primeras letras
         setInitials((nameParts[0].substring(0, 2)).toUpperCase());
       }
     }
   }, []);
 
-  // Cierra el menú de usuario al hacer clic fuera de él.
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -63,15 +67,13 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Cierra ambos menús al cambiar de ruta.
   useEffect(() => {
     setMobileOpen(false);
     setUserMenuOpen(false);
   }, [pathname]);
 
-  // --- Estilo compartido de los enlaces ---
   const linkClass = (isActive: boolean) =>
-    `block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+    `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
       isActive
         ? "bg-brand-orange/10 text-brand-orange"
         : "text-heading hover:bg-neutral-secondary hover:text-brand-orange"
@@ -146,19 +148,8 @@ export default function Navbar() {
             onClick={() => setMobileOpen((open) => !open)}
           >
             <span className="sr-only">Abrir menú principal</span>
-            <svg
-              className="h-5 w-5"
-              aria-hidden="true"
-              fill="none"
-              viewBox="0 0 17 14"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M1 1h15M1 7h15M1 13h15"
-              />
+            <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 17 14">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15" />
             </svg>
           </button>
         </div>
@@ -171,15 +162,52 @@ export default function Navbar() {
         >
           <ul className="mt-4 flex flex-col gap-1 md:mt-0 md:flex-row md:items-center md:gap-1">
             {NAV_LINKS.map((link) => {
-              const isActive =
-                link.href === "/"
-                  ? pathname === "/"
-                  : pathname?.startsWith(link.href);
+              const isActive = link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href);
+
+              if (link.subLinks) {
+                return (
+                  <li key={link.href} className="relative group">
+                    <Link
+                      href={link.href}
+                      className={`${linkClass(!!isActive)} flex items-center gap-1`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {link.label}
+                      <svg 
+                        className="h-4 w-4 transition-transform duration-200 group-hover:rotate-180" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </Link>
+                    
+                    <div className="absolute left-0 top-full hidden w-48 pt-2 group-hover:block">
+                      <div className="overflow-hidden rounded-xl border border-default bg-neutral-primary shadow-lg">
+                        <ul className="py-1.5 text-sm">
+                          {link.subLinks.map((subLink) => (
+                            <li key={subLink.href}>
+                              <Link
+                                href={subLink.href}
+                                className="block px-4 py-2 text-body transition-colors hover:bg-neutral-secondary hover:text-brand-orange"
+                              >
+                                {subLink.label}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                );
+              }
+
               return (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={linkClass(!!isActive)}
+                    className={`block ${linkClass(!!isActive)}`}
                     aria-current={isActive ? "page" : undefined}
                   >
                     {link.label}
