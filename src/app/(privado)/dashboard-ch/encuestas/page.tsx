@@ -5,6 +5,7 @@ import {
   encuestaService,
   type DatosPregunta,
   type PreguntaSatisfaccion,
+  type ResultadoEncuesta,
   type TipoRespuesta,
 } from '@/services/encuestaService';
 
@@ -30,7 +31,35 @@ function aFormulario(p: PreguntaSatisfaccion): DatosPregunta {
   };
 }
 
+const formatoFecha = new Intl.DateTimeFormat('es', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** Agrupa las respuestas de una encuesta por sección, en orden de pregunta. */
+function agruparPorSeccion(resultado: ResultadoEncuesta) {
+  const ordenadas = resultado.respuestas
+    .slice()
+    .sort((a, b) => a.pregunta.orden - b.pregunta.orden);
+
+  const secciones: { seccion: string; respuestas: typeof ordenadas }[] = [];
+  for (const r of ordenadas) {
+    let grupo = secciones.find((s) => s.seccion === r.pregunta.seccion);
+    if (!grupo) {
+      grupo = { seccion: r.pregunta.seccion, respuestas: [] };
+      secciones.push(grupo);
+    }
+    grupo.respuestas.push(r);
+  }
+  return secciones;
+}
+
 export default function EncuestasPage() {
+  const [vista, setVista] = useState<'preguntas' | 'resultados'>('preguntas');
+
   const [preguntas, setPreguntas] = useState<PreguntaSatisfaccion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,9 +72,38 @@ export default function EncuestasPage() {
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
 
+  // Resultados: encuestas completadas por los usuarios.
+  const [resultados, setResultados] = useState<ResultadoEncuesta[]>([]);
+  const [cargandoResultados, setCargandoResultados] = useState(false);
+  const [errorResultados, setErrorResultados] = useState<string | null>(null);
+  const [resultadosCargados, setResultadosCargados] = useState(false);
+  const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(
+    null
+  );
+
   useEffect(() => {
     cargarPreguntas();
   }, []);
+
+  const cargarResultados = () => {
+    setCargandoResultados(true);
+    setErrorResultados(null);
+    encuestaService
+      .obtenerResultados()
+      .then((data) => {
+        setResultados(data);
+        setResultadosCargados(true);
+      })
+      .catch((err: Error) => setErrorResultados(err.message))
+      .finally(() => setCargandoResultados(false));
+  };
+
+  const cambiarVista = (v: 'preguntas' | 'resultados') => {
+    setVista(v);
+    if (v === 'resultados' && !resultadosCargados && !cargandoResultados) {
+      cargarResultados();
+    }
+  };
 
   const cargarPreguntas = () => {
     setCargando(true);
@@ -136,37 +194,67 @@ export default function EncuestasPage() {
         <div>
           <h1 className="text-2xl font-bold text-heading sm:text-3xl">Encuestas</h1>
           <p className="mt-1 text-sm text-body">
-            Gestiona las preguntas de la encuesta de satisfacción.
+            {vista === 'preguntas'
+              ? 'Gestiona las preguntas de la encuesta de satisfacción.'
+              : 'Revisa las respuestas que cada usuario envió.'}
           </p>
         </div>
 
-        <button
-          onClick={abrirCrear}
-          className="inline-flex items-center justify-center rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-orange/90"
-        >
-          <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Agregar pregunta
-        </button>
+        {vista === 'preguntas' && (
+          <button
+            onClick={abrirCrear}
+            className="inline-flex items-center justify-center rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-orange/90"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Agregar pregunta
+          </button>
+        )}
       </header>
 
-      {/* PESTAÑAS: "Todas" + las secciones que ya existan en los datos */}
-      <div className="mt-8 flex flex-wrap items-center gap-3">
-        {['todas', ...secciones].map((seccion) => (
-          <button
-            key={seccion}
-            onClick={() => setSeccionActiva(seccion)}
-            className={`flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-all ${
-              seccionActiva === seccion
-                ? 'border-brand-orange bg-brand-orange text-white'
-                : 'border-default bg-white text-heading hover:border-brand-orange/50'
-            }`}
-          >
-            {seccion === 'todas' ? 'Todas' : seccion}
-          </button>
-        ))}
+      {/* PESTAÑAS: Preguntas vs Resultados */}
+      <div className="mt-6 inline-flex items-center gap-1 rounded-full border border-default bg-neutral-secondary/40 p-1">
+        <button
+          onClick={() => cambiarVista('preguntas')}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            vista === 'preguntas'
+              ? 'bg-white text-brand-orange shadow-sm'
+              : 'text-body hover:text-heading'
+          }`}
+        >
+          Preguntas
+        </button>
+        <button
+          onClick={() => cambiarVista('resultados')}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            vista === 'resultados'
+              ? 'bg-white text-brand-orange shadow-sm'
+              : 'text-body hover:text-heading'
+          }`}
+        >
+          Resultados
+        </button>
       </div>
+
+      {vista === 'preguntas' ? (
+        <>
+          {/* PESTAÑAS: "Todas" + las secciones que ya existan en los datos */}
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            {['todas', ...secciones].map((seccion) => (
+              <button
+                key={seccion}
+                onClick={() => setSeccionActiva(seccion)}
+                className={`flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-all ${
+                  seccionActiva === seccion
+                    ? 'border-brand-orange bg-brand-orange text-white'
+                    : 'border-default bg-white text-heading hover:border-brand-orange/50'
+                }`}
+              >
+                {seccion === 'todas' ? 'Todas' : seccion}
+              </button>
+            ))}
+          </div>
 
       {/* TABLA */}
       <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
@@ -251,6 +339,123 @@ export default function EncuestasPage() {
           </div>
         )}
       </section>
+        </>
+      ) : (
+        <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
+          {cargandoResultados ? (
+            <div className="flex justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+            </div>
+          ) : errorResultados ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <p className="text-sm font-medium text-heading">No se pudo cargar los resultados</p>
+              <p className="max-w-sm text-xs text-body">{errorResultados}</p>
+              <button
+                onClick={cargarResultados}
+                className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : resultados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-1 py-20 text-center text-body">
+              <p className="text-sm font-medium text-heading">Todavía nadie completó la encuesta.</p>
+              <p className="text-xs text-body">Cuando un usuario la responda, va a aparecer acá.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-default bg-neutral-secondary/60 text-xs uppercase tracking-wide text-brand-gray">
+                    <th className="px-5 py-3 font-semibold">Usuario</th>
+                    <th className="px-5 py-3 font-semibold">Departamento</th>
+                    <th className="px-5 py-3 font-semibold">Completada</th>
+                    <th className="px-5 py-3 font-semibold text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default">
+                  {resultados.map((r) => (
+                    <tr key={r.id} className="transition-colors hover:bg-neutral-secondary/40">
+                      <td className="px-5 py-4">
+                        <p className="font-medium text-heading">{r.usuario.nombre}</p>
+                        <p className="text-xs text-body">{r.usuario.email}</p>
+                      </td>
+                      <td className="px-5 py-4 text-body">{r.usuario.departamento}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-body">
+                        {formatoFecha.format(new Date(r.fecha_completado))}
+                      </td>
+                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setResultadoSeleccionado(r)}
+                          className="font-medium text-brand-orange hover:text-brand-orange/80"
+                        >
+                          Ver respuestas
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* MODAL: RESPUESTAS DE UN USUARIO */}
+      {resultadoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-default p-6">
+              <div>
+                <h2 className="text-xl font-bold text-heading">{resultadoSeleccionado.usuario.nombre}</h2>
+                <p className="mt-1 text-sm text-body">{resultadoSeleccionado.usuario.email}</p>
+                <p className="text-xs text-brand-gray">
+                  {resultadoSeleccionado.usuario.departamento} · Completada el{' '}
+                  {formatoFecha.format(new Date(resultadoSeleccionado.fecha_completado))}
+                </p>
+              </div>
+              <button
+                onClick={() => setResultadoSeleccionado(null)}
+                className="rounded-lg p-1.5 text-body hover:bg-neutral-secondary hover:text-heading"
+                aria-label="Cerrar"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="deinsa-scroll overflow-y-auto p-6">
+              {agruparPorSeccion(resultadoSeleccionado).map((grupo) => (
+                <div key={grupo.seccion} className="mb-6 last:mb-0">
+                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-orange">
+                    {grupo.seccion}
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    {grupo.respuestas.map((r) => (
+                      <div key={r.id} className="rounded-xl border border-default p-3.5">
+                        <p className="text-sm font-medium text-heading">{r.pregunta.pregunta}</p>
+                        {r.pregunta.tipo_respuesta === 'texto' ? (
+                          <p className="mt-2 rounded-lg bg-neutral-secondary/60 p-2.5 text-sm text-body italic">
+                            {r.respuesta_texto || 'Sin respuesta.'}
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-sm text-body">
+                            Respuesta:{' '}
+                            <span className="font-bold text-brand-orange">
+                              {r.respuesta_numerica ?? '—'}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE CREACIÓN / EDICIÓN */}
       {modalAbierto && (

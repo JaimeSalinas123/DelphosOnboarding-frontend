@@ -11,7 +11,13 @@ import {
 
 type MapaRespuestas = Record<string, number | string>;
 
-function SliderEscala({
+/**
+ * Barra de escala hecha con botones de Tailwind (no un <input type="range">
+ * nativo): evita depender de ::-webkit-slider-thumb / ::-moz-range-thumb,
+ * que son frágiles y fáciles de perder en el pipeline de build. Se "rellena"
+ * de naranja desde el mínimo hasta el valor elegido.
+ */
+function BarraEscala({
   pregunta,
   valor,
   onChange,
@@ -22,42 +28,105 @@ function SliderEscala({
 }) {
   const min = pregunta.escala_min ?? 1;
   const max = pregunta.escala_max ?? 5;
-  const respondida = valor !== undefined;
-  const valorMostrado = valor ?? min;
-  const porcentaje = max === min ? 0 : ((valorMostrado - min) / (max - min)) * 100;
+  const opciones = Array.from({ length: max - min + 1 }, (_, i) => min + i);
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-xs text-body">Totalmente en desacuerdo</span>
-        <span
-          className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white transition-colors ${
-            respondida ? 'bg-brand-orange' : 'bg-brand-gray-light'
-          }`}
-        >
-          {respondida ? valorMostrado : '?'}
-        </span>
         <span className="text-right text-xs text-body">Totalmente de acuerdo</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={1}
-        value={valorMostrado}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className={`encuesta-slider ${respondida ? '' : 'sin-responder'}`}
-        style={{
-          background: `linear-gradient(to right, var(--brand-orange) ${porcentaje}%, #e5e5e5 ${porcentaje}%)`,
-        }}
-      />
-      <div className="mt-1.5 flex justify-between text-[11px] text-brand-gray">
-        {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => (
-          <span key={n}>{n}</span>
-        ))}
+      <div className="flex overflow-hidden rounded-full border border-default">
+        {opciones.map((n) => {
+          const activo = valor !== undefined && n <= valor;
+          return (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              aria-label={`Calificar con ${n}`}
+              aria-pressed={valor === n}
+              className={`flex-1 border-r border-default py-2.5 text-xs font-semibold transition-colors last:border-r-0 ${
+                activo
+                  ? 'bg-brand-orange text-white'
+                  : 'bg-white text-body hover:bg-neutral-secondary'
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+/** Calificación con estrellas: para escalas 1–10 y para la pregunta de motivación (ver usaEstrellas). */
+function CalificacionEstrellas({
+  pregunta,
+  valor,
+  onChange,
+}: {
+  pregunta: PreguntaSatisfaccion;
+  valor: number | undefined;
+  onChange: (valor: number) => void;
+}) {
+  const min = pregunta.escala_min ?? 1;
+  const max = pregunta.escala_max ?? 5;
+  const [hover, setHover] = useState<number | null>(null);
+  const activoHasta = hover ?? valor ?? 0;
+
+  return (
+    <div>
+      <div
+        className="flex flex-wrap items-center gap-1"
+        onMouseLeave={() => setHover(null)}
+      >
+        {Array.from({ length: max - min + 1 }, (_, i) => min + i).map((n) => {
+          const lleno = n <= activoHasta;
+          return (
+            <button
+              key={n}
+              type="button"
+              onMouseEnter={() => setHover(n)}
+              onClick={() => onChange(n)}
+              aria-label={`Calificar con ${n} de ${max}`}
+              aria-pressed={valor === n}
+              className="p-0.5"
+            >
+              <svg
+                className={`h-7 w-7 transition-colors ${
+                  lleno ? 'text-brand-orange' : 'text-neutral-tertiary'
+                }`}
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.958a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.367 2.447a1 1 0 00-.364 1.118l1.286 3.957c.3.922-.755 1.688-1.539 1.118l-3.367-2.446a1 1 0 00-1.176 0l-3.367 2.446c-.784.57-1.838-.196-1.539-1.118l1.286-3.957a1 1 0 00-.363-1.118L2.83 9.385c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69z" />
+              </svg>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-xs text-body">
+        {valor !== undefined ? `${valor} de ${max}` : 'Sin calificar'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Heurística para decidir estrellas vs. barra numerada: las escalas de 10
+ * puntos (1–10) siempre van con estrellas, y la pregunta de motivación
+ * (pedida puntualmente) también, aunque sea 1–5. Es un match por texto, así
+ * que si cambia la redacción de esa pregunta hay que actualizar esto — lo
+ * más prolijo a futuro sería que el backend mande un campo explícito
+ * (ej. estilo_respuesta: 'barra' | 'estrellas') en vez de inferirlo acá.
+ */
+function usaEstrellas(p: PreguntaSatisfaccion): boolean {
+  if (p.tipo_respuesta !== 'escala') return false;
+  const rango = (p.escala_max ?? 0) - (p.escala_min ?? 0) + 1;
+  if (rango === 10) return true;
+  return /motivad/i.test(p.pregunta);
 }
 
 function CampoTexto({
@@ -283,15 +352,21 @@ export default function EncuestaPage() {
               {p.obligatoria && <span className="ml-1 text-brand-orange">*</span>}
             </p>
             <div className="mt-4">
-              {p.tipo_respuesta === 'escala' ? (
-                <SliderEscala
+              {p.tipo_respuesta === 'texto' ? (
+                <CampoTexto
+                  valor={respuestas[p.id] as string | undefined}
+                  onChange={(v) => responder(p.id, v)}
+                />
+              ) : usaEstrellas(p) ? (
+                <CalificacionEstrellas
                   pregunta={p}
                   valor={respuestas[p.id] as number | undefined}
                   onChange={(v) => responder(p.id, v)}
                 />
               ) : (
-                <CampoTexto
-                  valor={respuestas[p.id] as string | undefined}
+                <BarraEscala
+                  pregunta={p}
+                  valor={respuestas[p.id] as number | undefined}
                   onChange={(v) => responder(p.id, v)}
                 />
               )}

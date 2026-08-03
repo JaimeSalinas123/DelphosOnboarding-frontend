@@ -32,6 +32,37 @@ export interface RespuestaEnvio {
   respuesta_texto?: string | null;
 }
 
+/** Usuario dueño de una encuesta completada (vista de resultados, solo admin). */
+export interface UsuarioResultado {
+  id: string;
+  nombre: string;
+  email: string;
+  departamento: string;
+}
+
+/** Una respuesta ya guardada, con los datos de su pregunta embebidos. */
+export interface RespuestaResultado {
+  id: string;
+  respuesta_numerica: number | null;
+  respuesta_texto: string | null;
+  pregunta: {
+    id: string;
+    seccion: string;
+    pregunta: string;
+    orden: number;
+    tipo_respuesta: TipoRespuesta;
+  };
+}
+
+/** Una encuesta completada por un usuario, con todas sus respuestas. */
+export interface ResultadoEncuesta {
+  id: string;
+  estado: string;
+  fecha_completado: string;
+  usuario: UsuarioResultado;
+  respuestas: RespuestaResultado[];
+}
+
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = authService.getToken();
   const controller = new AbortController();
@@ -100,6 +131,14 @@ export const encuestaService = {
       method: 'POST',
       body: JSON.stringify({ respuestas }),
     });
+    return handleResponse(response);
+  },
+
+  // Resultados de todos los usuarios que completaron la encuesta (solo admin).
+  // Nota: asumo que vive en el mismo router que /preguntas y /encuestas
+  // (/api/satisfaccion/resultados). Si está montada aparte, avisame y ajusto.
+  obtenerResultados: async (): Promise<ResultadoEncuesta[]> => {
+    const response = await authFetch('/satisfaccion/resultados', { method: 'GET' });
     return handleResponse(response);
   },
 };
