@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { motion, MotionConfig, AnimatePresence, type Variants } from 'framer-motion';
 import { authService } from '@/services/authService';
+import SessionExpired from '@/components/global/SessionExpired';
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 28 },

@@ -8,15 +8,14 @@ import {
   type PreguntaSatisfaccion,
   type RespuestaEnvio,
 } from '@/services/encuestaService';
+import SessionExpired from '@/components/global/SessionExpired';
 
 type MapaRespuestas = Record<string, number | string>;
 
-/**
- * Barra de escala hecha con botones de Tailwind (no un <input type="range">
- * nativo): evita depender de ::-webkit-slider-thumb / ::-moz-range-thumb,
- * que son frágiles y fáciles de perder en el pipeline de build. Se "rellena"
- * de naranja desde el mínimo hasta el valor elegido.
- */
+// ============================================================================
+// FUNCIONES Y COMPONENTES AUXILIARES
+// ============================================================================
+
 function BarraEscala({
   pregunta,
   valor,
@@ -61,7 +60,6 @@ function BarraEscala({
   );
 }
 
-/** Calificación con estrellas: para escalas 1–10 y para la pregunta de motivación (ver usaEstrellas). */
 function CalificacionEstrellas({
   pregunta,
   valor,
@@ -114,14 +112,6 @@ function CalificacionEstrellas({
   );
 }
 
-/**
- * Heurística para decidir estrellas vs. barra numerada: las escalas de 10
- * puntos (1–10) siempre van con estrellas, y la pregunta de motivación
- * (pedida puntualmente) también, aunque sea 1–5. Es un match por texto, así
- * que si cambia la redacción de esa pregunta hay que actualizar esto — lo
- * más prolijo a futuro sería que el backend mande un campo explícito
- * (ej. estilo_respuesta: 'barra' | 'estrellas') en vez de inferirlo acá.
- */
 function usaEstrellas(p: PreguntaSatisfaccion): boolean {
   if (p.tipo_respuesta !== 'escala') return false;
   const rango = (p.escala_max ?? 0) - (p.escala_min ?? 0) + 1;
@@ -146,6 +136,10 @@ function CampoTexto({
     />
   );
 }
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 export default function EncuestaPage() {
   const [preguntas, setPreguntas] = useState<PreguntaSatisfaccion[]>([]);
@@ -224,8 +218,6 @@ export default function EncuestaPage() {
   };
 
   const handleEnviar = async () => {
-    // Revalida TODAS las secciones (no solo la última) por si algo obligatorio
-    // quedó sin responder en una anterior.
     const seccionInvalidaIndex = secciones.findIndex((s) => idsFaltantesEn(s).length > 0);
     if (seccionInvalidaIndex !== -1) {
       setSeccionIndex(seccionInvalidaIndex);
@@ -258,161 +250,184 @@ export default function EncuestaPage() {
     }
   };
 
+  // Envolvemos todo en un div maestro blanco
   if (cargando) {
     return (
-      <main className="flex flex-1 items-center justify-center py-24">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
-      </main>
+      <div className="flex flex-col flex-1 w-full bg-white">
+        <main className="flex flex-1 items-center justify-center py-24">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+        </main>
+      </div>
     );
   }
 
   if (error) {
+    const isAuthError = error.includes('401') || error.toLowerCase().includes('jwt') || error.toLowerCase().includes('autorizado');
+
+    if (isAuthError) {
+      return (
+        <div className="flex flex-col flex-1 w-full bg-white">
+          <main className="flex-1 flex flex-col items-center justify-center py-16 px-4">
+            <SessionExpired />
+          </main>
+        </div>
+      );
+    }
+
     return (
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-        <p className="text-sm font-medium text-heading">No se pudo cargar la encuesta</p>
-        <p className="mt-1 text-xs text-body">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
-        >
-          Reintentar
-        </button>
-      </main>
+      <div className="flex flex-col flex-1 w-full bg-white">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+          <p className="text-sm font-medium text-heading">No se pudo cargar la encuesta</p>
+          <p className="mt-1 text-xs text-body">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+          >
+            Reintentar
+          </button>
+        </main>
+      </div>
     );
   }
 
   if (preguntas.length === 0) {
     return (
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-        <p className="text-sm font-medium text-heading">
-          No hay una encuesta de satisfacción activa por el momento.
-        </p>
-      </main>
+      <div className="flex flex-col flex-1 w-full bg-white">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+          <p className="text-sm font-medium text-heading">
+            No hay una encuesta de satisfacción activa por el momento.
+          </p>
+        </main>
+      </div>
     );
   }
 
   if (enviada || yaCompletada) {
     return (
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 py-24 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
-          <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-        </div>
-        <h1 className="mt-5 text-2xl font-bold text-heading">
-          {enviada ? '¡Gracias por tu respuesta!' : 'Ya completaste esta encuesta'}
-        </h1>
-        <p className="mt-2 max-w-sm text-sm text-body">
-          {enviada
-            ? 'Tu encuesta de satisfacción fue enviada con éxito.'
-            : 'Cada persona puede responder la encuesta de satisfacción una sola vez.'}
-        </p>
-        <Link
-          href="/onboarding"
-          className="mt-6 rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-        >
-          Volver al inicio
-        </Link>
-      </main>
+      <div className="flex flex-col flex-1 w-full bg-white">
+        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+            <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </div>
+          <h1 className="mt-5 text-2xl font-bold text-heading">
+            {enviada ? '¡Gracias por tu respuesta!' : 'Ya completaste esta encuesta'}
+          </h1>
+          <p className="mt-2 max-w-sm text-sm text-body">
+            {enviada
+              ? 'Tu encuesta de satisfacción fue enviada con éxito.'
+              : 'Cada persona puede responder la encuesta de satisfacción una sola vez.'}
+          </p>
+          <Link
+            href="/onboarding"
+            className="mt-6 rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          >
+            Volver al inicio
+          </Link>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
-      <header className="text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-gray">
-          Encuesta de satisfacción
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-heading sm:text-3xl">{seccionActual}</h1>
-        <p className="mt-1 text-xs text-body">
-          Sección {seccionIndex + 1} de {secciones.length}
-        </p>
-      </header>
+    <div className="flex flex-col flex-1 w-full bg-white">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6">
+        <header className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-gray">
+            Encuesta de satisfacción
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-heading sm:text-3xl">{seccionActual}</h1>
+          <p className="mt-1 text-xs text-body">
+            Sección {seccionIndex + 1} de {secciones.length}
+          </p>
+        </header>
 
-      <div className="mt-5 flex items-center justify-center gap-2">
-        {secciones.map((s, i) => (
-          <span
-            key={s}
-            className={`h-1.5 rounded-full transition-all ${
-              i === seccionIndex
-                ? 'w-8 bg-brand-orange'
-                : i < seccionIndex
-                  ? 'w-1.5 bg-brand-orange/50'
-                  : 'w-1.5 bg-neutral-tertiary'
-            }`}
-          />
-        ))}
-      </div>
+        <div className="mt-5 flex items-center justify-center gap-2">
+          {secciones.map((s, i) => (
+            <span
+              key={s}
+              className={`h-1.5 rounded-full transition-all ${
+                i === seccionIndex
+                  ? 'w-8 bg-brand-orange'
+                  : i < seccionIndex
+                    ? 'w-1.5 bg-brand-orange/50'
+                    : 'w-1.5 bg-neutral-tertiary'
+              }`}
+            />
+          ))}
+        </div>
 
-      <div className="mt-8 flex flex-col gap-4">
-        {preguntasActuales.map((p) => (
-          <div key={p.id} className="rounded-2xl border border-default bg-neutral-primary p-5 shadow-sm sm:p-6">
-            <p className="text-sm font-semibold text-heading">
-              {p.pregunta}
-              {p.obligatoria && <span className="ml-1 text-brand-orange">*</span>}
-            </p>
-            <div className="mt-4">
-              {p.tipo_respuesta === 'texto' ? (
-                <CampoTexto
-                  valor={respuestas[p.id] as string | undefined}
-                  onChange={(v) => responder(p.id, v)}
-                />
-              ) : usaEstrellas(p) ? (
-                <CalificacionEstrellas
-                  pregunta={p}
-                  valor={respuestas[p.id] as number | undefined}
-                  onChange={(v) => responder(p.id, v)}
-                />
-              ) : (
-                <BarraEscala
-                  pregunta={p}
-                  valor={respuestas[p.id] as number | undefined}
-                  onChange={(v) => responder(p.id, v)}
-                />
+        <div className="mt-8 flex flex-col gap-4">
+          {preguntasActuales.map((p) => (
+            <div key={p.id} className="rounded-2xl border border-default bg-neutral-primary p-5 shadow-sm sm:p-6">
+              <p className="text-sm font-semibold text-heading">
+                {p.pregunta}
+                {p.obligatoria && <span className="ml-1 text-brand-orange">*</span>}
+              </p>
+              <div className="mt-4">
+                {p.tipo_respuesta === 'texto' ? (
+                  <CampoTexto
+                    valor={respuestas[p.id] as string | undefined}
+                    onChange={(v: string) => responder(p.id, v)}
+                  />
+                ) : usaEstrellas(p) ? (
+                  <CalificacionEstrellas
+                    pregunta={p}
+                    valor={respuestas[p.id] as number | undefined}
+                    onChange={(v: number) => responder(p.id, v)}
+                  />
+                ) : (
+                  <BarraEscala
+                    pregunta={p}
+                    valor={respuestas[p.id] as number | undefined}
+                    onChange={(v: number) => responder(p.id, v)}
+                  />
+                )}
+              </div>
+              {faltantes.has(p.id) && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  Esta pregunta es obligatoria.
+                </p>
               )}
             </div>
-            {faltantes.has(p.id) && (
-              <p className="mt-2 text-xs font-medium text-red-600">
-                Esta pregunta es obligatoria.
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {errorEnvio && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
-          No se pudo enviar la encuesta: {errorEnvio}
+          ))}
         </div>
-      )}
 
-      <div className="mt-8 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={irAnterior}
-          disabled={esPrimeraSeccion || enviando}
-          className="inline-flex items-center gap-2 rounded-lg border border-default px-4 py-2.5 text-sm font-semibold text-heading transition-colors hover:border-brand-orange/50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
-          Anterior
-        </button>
+        {errorEnvio && (
+          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+            No se pudo enviar la encuesta: {errorEnvio}
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={irSiguiente}
-          disabled={enviando}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          {esUltimaSeccion ? (enviando ? 'Enviando...' : 'Enviar encuesta') : 'Siguiente'}
-          {!esUltimaSeccion && (
+        <div className="mt-8 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={irAnterior}
+            disabled={esPrimeraSeccion || enviando}
+            className="inline-flex items-center gap-2 rounded-lg border border-default px-4 py-2.5 text-sm font-semibold text-heading transition-colors hover:border-brand-orange/50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
             </svg>
-          )}
-        </button>
-      </div>
-    </main>
+            Anterior
+          </button>
+
+          <button
+            type="button"
+            onClick={irSiguiente}
+            disabled={enviando}
+            className="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {esUltimaSeccion ? (enviando ? 'Enviando...' : 'Enviar encuesta') : 'Siguiente'}
+            {!esUltimaSeccion && (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </main>
+    </div>
   );
 }
