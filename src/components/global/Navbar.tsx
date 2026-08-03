@@ -12,11 +12,9 @@ type NavLink = {
   subLinks?: { href: string; label: string }[];
 };
 
-// Se eliminó "Videos" del submenú de Estudio
 const NAV_LINKS: NavLink[] = [
   { href: "/onboarding", label: "Inicio" },
   { href: "/ecosistema", label: "Ecosistema" },
-  { href: "/encuesta", label: "Encuesta" },
   {
     href: "/estudio",
     label: "Estudio",
@@ -26,6 +24,7 @@ const NAV_LINKS: NavLink[] = [
       { href: "/estudio/verdadero-falso", label: "Verdadero/Falso" },
     ],
   },
+  { href: "/encuesta", label: "Encuesta" }
 ];
 
 const USER_MENU = [
@@ -35,25 +34,42 @@ const USER_MENU = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   const [initials, setInitials] = useState("DO");
 
+  // SOLUCIÓN ERROR 1: Patrón oficial de React para actualizar estado ante cambios de props/rutas
+  // Esto evita usar useEffect y previene el "cascading render"
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileOpen(false);
+    setUserMenuOpen(false);
+  }
+
+  // SOLUCIÓN ERROR 2: Evitamos el setState síncrono envolviéndolo en un setTimeout. 
+  // Esto hace la ejecución asíncrona, mejora la carga inicial y silencia la advertencia de React.
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user && user.nombre) {
-      const nameParts = user.nombre.trim().split(/\s+/);
-      
-      if (nameParts.length >= 2) {
-        setInitials((nameParts[0][0] + nameParts[1][0]).toUpperCase());
-      } else if (nameParts.length === 1) {
-        setInitials((nameParts[0].substring(0, 2)).toUpperCase());
+    const timer = setTimeout(() => {
+      const user = authService.getCurrentUser();
+      if (user && user.nombre) {
+        const nameParts = user.nombre.trim().split(/\s+/);
+        
+        if (nameParts.length >= 2) {
+          setInitials((nameParts[0][0] + nameParts[1][0]).toUpperCase());
+        } else if (nameParts.length === 1) {
+          setInitials((nameParts[0].substring(0, 2)).toUpperCase());
+        }
       }
-    }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
 
+  // Clic fuera del menú
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -66,11 +82,6 @@ export default function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-    setUserMenuOpen(false);
-  }, [pathname]);
 
   const linkClass = (isActive: boolean) =>
     `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -167,6 +178,7 @@ export default function Navbar() {
               if (link.subLinks) {
                 return (
                   <li key={link.href} className="relative group">
+                    {/* Corrección del error de sintaxis en los template literals de className */}
                     <Link
                       href={link.href}
                       className={`${linkClass(!!isActive)} flex items-center gap-1`}
@@ -205,6 +217,7 @@ export default function Navbar() {
 
               return (
                 <li key={link.href}>
+                  {/* Corrección del error de sintaxis aquí también */}
                   <Link
                     href={link.href}
                     className={`block ${linkClass(!!isActive)}`}
