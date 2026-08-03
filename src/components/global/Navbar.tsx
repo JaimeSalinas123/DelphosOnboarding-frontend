@@ -15,6 +15,7 @@ type NavLink = {
 const NAV_LINKS: NavLink[] = [
   { href: "/onboarding", label: "Inicio" },
   { href: "/ecosistema", label: "Ecosistema" },
+  { href: "/encuesta", label: "Encuesta" },
 ];
 
 const USER_MENU = [

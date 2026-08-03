@@ -25,6 +25,13 @@ export type DatosPregunta = {
   obligatoria: boolean;
 };
 
+/** Una respuesta del pasante a una pregunta puntual. */
+export interface RespuestaEnvio {
+  pregunta_id: string;
+  respuesta_numerica?: number | null;
+  respuesta_texto?: string | null;
+}
+
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = authService.getToken();
   const controller = new AbortController();
@@ -82,4 +89,22 @@ export const encuestaService = {
     });
     await handleResponse(response);
   },
+
+  // Envío del pasante (una sola vez por usuario; el backend rechaza con 409
+  // si ya existe una encuesta previa para su usuario_id).
+  // Nota: asumo que esta ruta vive en el mismo router que /preguntas
+  // (/api/satisfaccion/encuestas). Si en tu backend está montada aparte,
+  // avisame y ajusto la URL.
+  enviar: async (respuestas: RespuestaEnvio[]): Promise<{ mensaje: string; encuestaId: string }> => {
+    const response = await authFetch('/satisfaccion/encuestas', {
+      method: 'POST',
+      body: JSON.stringify({ respuestas }),
+    });
+    return handleResponse(response);
+  },
 };
+
+/** El backend usa este mensaje exacto para "ya respondiste esta encuesta". */
+export function esErrorYaCompletada(mensaje: string): boolean {
+  return mensaje.toLowerCase().includes('ya has completado');
+}
