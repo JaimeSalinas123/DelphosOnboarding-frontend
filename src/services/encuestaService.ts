@@ -1,4 +1,5 @@
 import { API_URL, REQUEST_TIMEOUT_MS, authService, handleResponse } from './authService';
+import type { Paginacion } from '@/lib/paginacion';
 
 export type TipoRespuesta = 'escala' | 'texto';
 
@@ -61,6 +62,18 @@ export interface ResultadoEncuesta {
   fecha_completado: string;
   usuario: UsuarioResultado;
   respuestas: RespuestaResultado[];
+}
+
+export interface FiltrosResultados {
+  /** Página a pedir (1-indexed). El backend por defecto usa 1. */
+  pagina?: number;
+  /** Tamaño de página. El backend por defecto usa 10, tope 100. */
+  limite?: number;
+}
+
+export interface ListadoResultados {
+  resultados: ResultadoEncuesta[];
+  paginacion: Paginacion;
 }
 
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -134,12 +147,33 @@ export const encuestaService = {
     return handleResponse(response);
   },
 
-  // Resultados de todos los usuarios que completaron la encuesta (solo admin).
-  // Nota: asumo que vive en el mismo router que /preguntas y /encuestas
-  // (/api/satisfaccion/resultados). Si está montada aparte, avisame y ajusto.
-  obtenerResultados: async (): Promise<ResultadoEncuesta[]> => {
-    const response = await authFetch('/satisfaccion/resultados', { method: 'GET' });
+  // Resultados de todos los usuarios que completaron la encuesta (solo admin),
+  // paginados. Nota: asumo que vive en el mismo router que /preguntas y
+  // /encuestas (/api/satisfaccion/resultados). Si está montada aparte, avisame y ajusto.
+  obtenerResultados: async (filtros: FiltrosResultados = {}): Promise<ListadoResultados> => {
+    const params = new URLSearchParams();
+    if (filtros.pagina) params.set('pagina', String(filtros.pagina));
+    if (filtros.limite) params.set('limite', String(filtros.limite));
+    const query = params.toString();
+
+    const response = await authFetch(`/satisfaccion/resultados${query ? `?${query}` : ''}`, {
+      method: 'GET',
+    });
     return handleResponse(response);
+  },
+
+  // Trae todos los resultados (sin paginar), recorriendo todas las páginas
+  // con el límite máximo que acepta el backend. Pensado para agregaciones
+  // en cliente (ej. promedios por pregunta, avance en el tiempo).
+  obtenerTodosLosResultados: async (): Promise<ResultadoEncuesta[]> => {
+    const LIMITE_MAXIMO = 100;
+    const primera = await encuestaService.obtenerResultados({ pagina: 1, limite: LIMITE_MAXIMO });
+    const resultados = [...primera.resultados];
+    for (let pagina = 2; pagina <= primera.paginacion.totalPaginas; pagina++) {
+      const siguiente = await encuestaService.obtenerResultados({ pagina, limite: LIMITE_MAXIMO });
+      resultados.push(...siguiente.resultados);
+    }
+    return resultados;
   },
 };
 

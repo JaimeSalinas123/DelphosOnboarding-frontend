@@ -9,6 +9,10 @@ import {
 } from '@/services/usuarioService';
 import { etiquetaRol } from '@/lib/roles';
 import { DEPARTAMENTOS } from '@/lib/departamentos';
+import type { Paginacion } from '@/lib/paginacion';
+import Paginador from '@/components/global/Paginador';
+
+const USUARIOS_POR_PAGINA = 10;
 
 /** Roles que el toggle de la tabla entiende; todo lo demás (ej. 'evaluador') se ve como badge fijo. */
 function esRolEditable(rol: string): rol is RolEditable {
@@ -76,6 +80,8 @@ export default function UsuariosPage() {
   const [busquedaDebounced, setBusquedaDebounced] = useState('');
   const [departamentoFiltro, setDepartamentoFiltro] = useState('');
   const [intentos, setIntentos] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const [paginacion, setPaginacion] = useState<Paginacion | null>(null);
 
   const puedeEditarRoles = usuarioActual?.rol === 'administrador';
   const hayFiltrosActivos = !!busqueda || !!departamentoFiltro;
@@ -86,23 +92,35 @@ export default function UsuariosPage() {
 
   // Espera a que el usuario deje de tipear antes de pegarle al backend.
   useEffect(() => {
-    const id = setTimeout(() => setBusquedaDebounced(busqueda.trim()), 400);
+    const id = setTimeout(() => {
+      setBusquedaDebounced(busqueda.trim());
+      setPagina(1);
+    }, 400);
     return () => clearTimeout(id);
   }, [busqueda]);
 
   // Recarga cuando cambia el filtro por departamento, la búsqueda (ya
-  // debounced) o cuando se pide reintentar tras un error.
+  // debounced), la página o cuando se pide reintentar tras un error.
   useEffect(() => {
     let cancelado = false;
+    // El flag de carga/error se resetea al iniciar cada pedido: es el
+    // patrón estándar de fetch-con-spinner (react.dev/learn/synchronizing-with-effects#fetching-data);
+    // la regla nueva de React Compiler lo marca como "derived state" pero acá es intencional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCargando(true);
     setError(null);
     usuarioService
       .listar({
         nombre: busquedaDebounced || undefined,
         departamento: departamentoFiltro || undefined,
+        pagina,
+        limite: USUARIOS_POR_PAGINA,
       })
       .then((data) => {
-        if (!cancelado) setUsuarios(data);
+        if (!cancelado) {
+          setUsuarios(data.usuarios);
+          setPaginacion(data.paginacion);
+        }
       })
       .catch((err: Error) => {
         if (!cancelado) setError(err.message);
@@ -113,11 +131,17 @@ export default function UsuariosPage() {
     return () => {
       cancelado = true;
     };
-  }, [busquedaDebounced, departamentoFiltro, intentos]);
+  }, [busquedaDebounced, departamentoFiltro, pagina, intentos]);
+
+  const cambiarDepartamentoFiltro = (valor: string) => {
+    setDepartamentoFiltro(valor);
+    setPagina(1);
+  };
 
   const limpiarFiltros = () => {
     setBusqueda('');
     setDepartamentoFiltro('');
+    setPagina(1);
   };
 
   const cambiarRol = async (usuario: UsuarioListado, nuevoRol: RolEditable) => {
@@ -164,9 +188,9 @@ export default function UsuariosPage() {
             Usuarios registrados en Delphos Onboarding.
           </p>
         </div>
-        {!cargando && !error && (
+        {!cargando && !error && paginacion && (
           <span className="rounded-full bg-neutral-secondary px-3 py-1 text-xs font-medium text-body">
-            {usuarios.length} {usuarios.length === 1 ? 'usuario' : 'usuarios'}
+            {paginacion.total} {paginacion.total === 1 ? 'usuario' : 'usuarios'}
           </span>
         )}
       </header>
@@ -181,7 +205,7 @@ export default function UsuariosPage() {
         />
         <select
           value={departamentoFiltro}
-          onChange={(e) => setDepartamentoFiltro(e.target.value)}
+          onChange={(e) => cambiarDepartamentoFiltro(e.target.value)}
           className={`${selectClass} sm:w-56`}
         >
           <option value="">Todos los departamentos</option>
@@ -277,6 +301,9 @@ export default function UsuariosPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {!cargando && !error && paginacion && (
+          <Paginador paginacion={paginacion} onCambiarPagina={setPagina} />
         )}
       </section>
     </div>

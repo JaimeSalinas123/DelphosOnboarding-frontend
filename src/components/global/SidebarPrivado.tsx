@@ -64,6 +64,19 @@ const ENLACES = [
       </svg>
     ),
   },
+  {
+    href: '/dashboard-ch/metricas',
+    label: 'Métricas',
+    icono: (
+      <svg {...ICON_PROPS}>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 3v16a2 2 0 0 0 2 2h16M7 16v-4m5 4V8m5 8v-7"
+        />
+      </svg>
+    ),
+  },
 ];
 
 function estaActivo(pathname: string | null, href: string) {

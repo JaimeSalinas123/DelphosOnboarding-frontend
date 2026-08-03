@@ -8,6 +8,10 @@ import {
   type ResultadoEncuesta,
   type TipoRespuesta,
 } from '@/services/encuestaService';
+import type { Paginacion } from '@/lib/paginacion';
+import Paginador from '@/components/global/Paginador';
+
+const RESULTADOS_POR_PAGINA = 10;
 
 const FORM_VACIO: DatosPregunta = {
   seccion: '',
@@ -74,36 +78,14 @@ export default function EncuestasPage() {
 
   // Resultados: encuestas completadas por los usuarios.
   const [resultados, setResultados] = useState<ResultadoEncuesta[]>([]);
+  const [paginacionResultados, setPaginacionResultados] = useState<Paginacion | null>(null);
   const [cargandoResultados, setCargandoResultados] = useState(false);
   const [errorResultados, setErrorResultados] = useState<string | null>(null);
-  const [resultadosCargados, setResultadosCargados] = useState(false);
+  const [intentosResultados, setIntentosResultados] = useState(0);
+  const [paginaResultados, setPaginaResultados] = useState(1);
   const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(
     null
   );
-
-  useEffect(() => {
-    cargarPreguntas();
-  }, []);
-
-  const cargarResultados = () => {
-    setCargandoResultados(true);
-    setErrorResultados(null);
-    encuestaService
-      .obtenerResultados()
-      .then((data) => {
-        setResultados(data);
-        setResultadosCargados(true);
-      })
-      .catch((err: Error) => setErrorResultados(err.message))
-      .finally(() => setCargandoResultados(false));
-  };
-
-  const cambiarVista = (v: 'preguntas' | 'resultados') => {
-    setVista(v);
-    if (v === 'resultados' && !resultadosCargados && !cargandoResultados) {
-      cargarResultados();
-    }
-  };
 
   const cargarPreguntas = () => {
     setCargando(true);
@@ -114,6 +96,38 @@ export default function EncuestasPage() {
       .catch((err: Error) => setError(err.message))
       .finally(() => setCargando(false));
   };
+
+  useEffect(() => {
+    // Patrón estándar de fetch-con-spinner al montar (react.dev/learn/synchronizing-with-effects#fetching-data).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    cargarPreguntas();
+  }, []);
+
+  // Solo pega al backend una vez que se entra a la pestaña; recarga al
+  // cambiar de página o reintentar tras un error.
+  useEffect(() => {
+    if (vista !== 'resultados') return;
+    let cancelado = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCargandoResultados(true);
+    setErrorResultados(null);
+    encuestaService
+      .obtenerResultados({ pagina: paginaResultados, limite: RESULTADOS_POR_PAGINA })
+      .then((data) => {
+        if (cancelado) return;
+        setResultados(data.resultados);
+        setPaginacionResultados(data.paginacion);
+      })
+      .catch((err: Error) => {
+        if (!cancelado) setErrorResultados(err.message);
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoResultados(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [vista, paginaResultados, intentosResultados]);
 
   const secciones = useMemo(
     () => Array.from(new Set(preguntas.map((p) => p.seccion))),
@@ -216,7 +230,7 @@ export default function EncuestasPage() {
       {/* PESTAÑAS: Preguntas vs Resultados */}
       <div className="mt-6 inline-flex items-center gap-1 rounded-full border border-default bg-neutral-secondary/40 p-1">
         <button
-          onClick={() => cambiarVista('preguntas')}
+          onClick={() => setVista('preguntas')}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
             vista === 'preguntas'
               ? 'bg-white text-brand-orange shadow-sm'
@@ -226,7 +240,7 @@ export default function EncuestasPage() {
           Preguntas
         </button>
         <button
-          onClick={() => cambiarVista('resultados')}
+          onClick={() => setVista('resultados')}
           className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
             vista === 'resultados'
               ? 'bg-white text-brand-orange shadow-sm'
@@ -351,7 +365,7 @@ export default function EncuestasPage() {
               <p className="text-sm font-medium text-heading">No se pudo cargar los resultados</p>
               <p className="max-w-sm text-xs text-body">{errorResultados}</p>
               <button
-                onClick={cargarResultados}
+                onClick={() => setIntentosResultados((n) => n + 1)}
                 className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               >
                 Reintentar
@@ -397,6 +411,9 @@ export default function EncuestasPage() {
                 </tbody>
               </table>
             </div>
+          )}
+          {!cargandoResultados && !errorResultados && paginacionResultados && (
+            <Paginador paginacion={paginacionResultados} onCambiarPagina={setPaginaResultados} />
           )}
         </section>
       )}
