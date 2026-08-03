@@ -9,6 +9,7 @@ import PanelInfoModulo from '@/components/ecosistema/PanelInfoModulo';
 import EstadoVacio from '@/components/ecosistema/EstadoVacio';
 import FondoEcosistema from '@/components/ecosistema/FondoEcosistema';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import SessionExpired from '@/components/global/SessionExpired';
 
 const EcosistemaScene = dynamic(
   () => import('@/components/ecosistema/EcosistemaScene'),

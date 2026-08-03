@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { authService } from "@/services/authService";
 import Navbar from "@/components/global/Navbar";
-import ChatbotFlotante from "@/components/global/ChatbotFlotante"; // <-- Importado aquí correctamente
+import ChatbotFlotante from "@/components/global/ChatbotFlotante";
+import SessionExpired from "@/components/global/SessionExpired"; // <-- Componente reutilizable importado
 
 export default function PublicoLayout({
   children,
@@ -13,17 +15,60 @@ export default function PublicoLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  
+  // Estado para controlar si mostramos la pantalla de inactividad
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState(false);
+  
+  // Referencia para el temporizador de inactividad
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 30 minutos en milisegundos
+  const TIEMPO_INACTIVIDAD_MS = 30 * 60 * 1000;
 
+  // Función para reiniciar el cronómetro
+  const resetearTemporizador = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    
+    timeoutRef.current = setTimeout(() => {
+      authService.logout(); 
+      setSessionExpiredMsg(true); 
+    }, TIEMPO_INACTIVIDAD_MS);
+  };
+
+  // Efecto para escuchar la actividad del usuario (mueve el mouse, teclea, etc.)
   useEffect(() => {
-    // Si el sistema ya terminó de revisar la memoria y se da cuenta de que NO estás logueado,
-    // te expulsa inmediatamente a la pantalla de login.
-    if (!isLoading && !isAuthenticated) {
+    if (isAuthenticated && !sessionExpiredMsg) {
+      const eventosActividad = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+      const manejarActividad = () => resetearTemporizador();
+
+      resetearTemporizador(); // Arranca el reloj
+
+      eventosActividad.forEach(evento => document.addEventListener(evento, manejarActividad));
+
+      return () => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        eventosActividad.forEach(evento => document.removeEventListener(evento, manejarActividad));
+      };
+    }
+  }, [isAuthenticated, sessionExpiredMsg]);
+
+  // Si el sistema revisa la memoria y NO estás logueado (y no es por inactividad), expulsa al login.
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !sessionExpiredMsg) {
       router.push('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, sessionExpiredMsg]);
 
-  // CASO 1: Le diste F5 (Refresh) a la página.
-  // Mientras Next.js revisa el localStorage, mostramos una pantalla de carga.
+  // CASO 1: BLOQUEO POR INACTIVIDAD (Renderizamos el nuevo componente global)
+  if (sessionExpiredMsg) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+        <SessionExpired />
+      </div>
+    );
+  }
+
+  // CASO 2: PANTALLA DE CARGA (Refresh)
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
@@ -38,12 +83,12 @@ export default function PublicoLayout({
     );
   }
 
-  // CASO 2: Eres un intruso (o abriste una pestaña de incógnito).
+  // CASO 3: INTRUSO
   if (!isAuthenticated) {
     return null; 
   }
 
-  // CASO 3: Tienes credenciales válidas. Mostramos Navbar, contenido y el Chatbot Flotante.
+  // CASO 4: CREDENCIALES VÁLIDAS
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 relative">
       <Navbar />
@@ -52,7 +97,7 @@ export default function PublicoLayout({
         {children}
       </main>
 
-      {/* El asistente virtual ahora vive exclusivamente en las rutas protegidas */}
+      {/* El asistente virtual vive exclusivamente en las rutas protegidas */}
       <ChatbotFlotante />
     </div>
   );
