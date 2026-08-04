@@ -42,16 +42,12 @@ export default function Navbar() {
   
   const [initials, setInitials] = useState("DO");
 
-  // SOLUCIÓN ERROR 1: Patrón oficial de React para actualizar estado ante cambios de props/rutas
-  // Esto evita usar useEffect y previene el "cascading render"
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
     setMobileOpen(false);
     setUserMenuOpen(false);
   }
 
-  // SOLUCIÓN ERROR 2: Evitamos el setState síncrono envolviéndolo en un setTimeout. 
-  // Esto hace la ejecución asíncrona, mejora la carga inicial y silencia la advertencia de React.
   useEffect(() => {
     const timer = setTimeout(() => {
       const user = authService.getCurrentUser();
@@ -69,7 +65,6 @@ export default function Navbar() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Clic fuera del menú
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -178,7 +173,6 @@ export default function Navbar() {
               if (link.subLinks) {
                 return (
                   <li key={link.href} className="relative group">
-                    {/* Corrección del error de sintaxis en los template literals de className */}
                     <Link
                       href={link.href}
                       className={`${linkClass(!!isActive)} flex items-center gap-1`}
@@ -217,7 +211,6 @@ export default function Navbar() {
 
               return (
                 <li key={link.href}>
-                  {/* Corrección del error de sintaxis aquí también */}
                   <Link
                     href={link.href}
                     className={`block ${linkClass(!!isActive)}`}
