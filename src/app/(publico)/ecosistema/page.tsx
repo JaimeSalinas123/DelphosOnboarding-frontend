@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { modulos } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 import PanelInfoModulo from '@/components/ecosistema/PanelInfoModulo';
 import EstadoVacio from '@/components/ecosistema/EstadoVacio';
 import FondoEcosistema from '@/components/ecosistema/FondoEcosistema';
@@ -84,7 +85,7 @@ export default function EcosistemaPage() {
   const [mounted, setMounted] = useState(false);
 
   const selectedId = useEcosistemaStore((s) => s.selectedId);
-  const visitedIds = useEcosistemaStore((s) => s.visitedIds);
+  const visitedIds = useProgresoStore((s) => s.modulosVistos);
   const step = useEcosistemaStore((s) => s.step);
   const deselect = useEcosistemaStore((s) => s.deselect);
   const select = useEcosistemaStore((s) => s.select);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getModuloIndex, modulos } from '@/data/modulos';
+import { useProgresoStore } from './useProgresoStore';
 
 interface EcosistemaState {
   /** Módulo actualmente seleccionado (panel abierto), o null si ninguno. */
@@ -8,8 +9,6 @@ interface EcosistemaState {
   hoveredId: string | null;
   /** true mientras el usuario arrastra OrbitControls: pausa la rotación idle. */
   userInteracting: boolean;
-  /** ids de módulos que ya se seleccionaron al menos una vez en esta sesión. */
-  visitedIds: string[];
 
   select: (id: string) => void;
   deselect: () => void;
@@ -20,27 +19,22 @@ interface EcosistemaState {
   step: (direction: 1 | -1) => void;
 }
 
-function withVisited(visitedIds: string[], id: string): string[] {
-  return visitedIds.includes(id) ? visitedIds : [...visitedIds, id];
-}
-
+// Qué módulos ya se visitaron vive en useProgresoStore (única fuente de verdad,
+// compartida con el backend) — este store solo maneja la interacción 3D.
 export const useEcosistemaStore = create<EcosistemaState>((set, get) => ({
   selectedId: null,
   hoveredId: null,
   userInteracting: false,
-  visitedIds: [],
 
-  select: (id) =>
-    set((state) => ({
-      selectedId: id,
-      visitedIds: withVisited(state.visitedIds, id),
-    })),
+  select: (id) => {
+    set({ selectedId: id });
+    useProgresoStore.getState().registrarModulo(id);
+  },
   deselect: () => set({ selectedId: null }),
-  toggleSelect: (id) =>
-    set((state) => ({
-      selectedId: state.selectedId === id ? null : id,
-      visitedIds: withVisited(state.visitedIds, id),
-    })),
+  toggleSelect: (id) => {
+    set((state) => ({ selectedId: state.selectedId === id ? null : id }));
+    useProgresoStore.getState().registrarModulo(id);
+  },
   setHovered: (id) => set({ hoveredId: id }),
   setUserInteracting: (value) => set({ userInteracting: value }),
   step: (direction) => {
@@ -49,9 +43,7 @@ export const useEcosistemaStore = create<EcosistemaState>((set, get) => ({
     const total = modulos.length;
     const nextIndex = (currentIndex + direction + total) % total;
     const nextId = modulos[nextIndex].id;
-    set((state) => ({
-      selectedId: nextId,
-      visitedIds: withVisited(state.visitedIds, nextId),
-    }));
+    set({ selectedId: nextId });
+    useProgresoStore.getState().registrarModulo(nextId);
   },
 }));

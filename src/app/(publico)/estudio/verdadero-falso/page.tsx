@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
 import { authService } from '@/services/authService';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseVF = 'inicio' | 'cargando' | 'preguntas' | 'resultados' | 'error';
 
@@ -78,6 +79,8 @@ export default function VerdaderoFalsoPage() {
             puntuacion: calcularPuntuacion(),
             total_preguntas: preguntas.length
           });
+          // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
+          useProgresoStore.getState().cargar();
         } catch (err) {
           console.error("No se pudo guardar la nota en la bd", err);
         }

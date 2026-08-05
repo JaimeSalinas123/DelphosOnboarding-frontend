@@ -9,6 +9,7 @@ import {
   type RespuestaEnvio,
 } from '@/services/encuestaService';
 import SessionExpired from '@/components/global/SessionExpired';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type MapaRespuestas = Record<string, number | string>;
 
@@ -238,6 +239,8 @@ export default function EncuestaPage() {
     try {
       await encuestaService.enviar(payload);
       setEnviada(true);
+      // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
+      useProgresoStore.getState().cargar();
     } catch (err) {
       const mensaje = (err as Error).message;
       if (esErrorYaCompletada(mensaje)) {

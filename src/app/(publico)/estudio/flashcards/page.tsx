@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
 import { authService } from '@/services/authService';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseFlashcard = 'inicio' | 'cargando' | 'estudio' | 'fin' | 'error';
 
@@ -68,6 +69,8 @@ export default function FlashcardsPage() {
             puntuacion: null, // No hay puntaje aquí
             total_preguntas: tarjetas.length
           });
+          // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
+          useProgresoStore.getState().cargar();
         } catch (err) {
           console.error("No se pudo guardar el registro en la bd", err);
         }

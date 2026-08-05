@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
 import { authService } from '@/services/authService';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseCuestionario = 'inicio' | 'cargando' | 'preguntas' | 'resultados' | 'error';
 
@@ -109,6 +110,8 @@ console.log("📝 DATOS EXACTOS DEL USUARIO:", JSON.stringify(user, null, 2));
               total_preguntas: preguntas.length
             });
             console.log("✅ Resultado guardado exitosamente en BD para ID:", userIdString);
+            // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
+            useProgresoStore.getState().cargar();
           } catch (err) {
             console.error("❌ Error al guardar el resultado en la BD:", err);
           }

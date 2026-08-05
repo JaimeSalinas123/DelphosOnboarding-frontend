@@ -6,6 +6,7 @@ import { Billboard, Html, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Modulo } from '@/data/modulos';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 import { BRAND_ORANGE } from '@/lib/theme';
 
 interface NodoModuloProps {
@@ -42,10 +43,10 @@ export default function NodoModulo({
 
   const hoveredId = useEcosistemaStore((s) => s.hoveredId);
   const selectedId = useEcosistemaStore((s) => s.selectedId);
-  const visitedIds = useEcosistemaStore((s) => s.visitedIds);
+  const modulosVistos = useProgresoStore((s) => s.modulosVistos);
   const setHovered = useEcosistemaStore((s) => s.setHovered);
   const toggleSelect = useEcosistemaStore((s) => s.toggleSelect);
-  const visited = visitedIds.includes(modulo.id);
+  const visited = modulosVistos.includes(modulo.id);
 
   const isSelected = selectedId === modulo.id;
   const isHovered = hoveredId === modulo.id;

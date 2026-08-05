@@ -5,6 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { authService } from "@/services/authService";
+import { useProgresoStore } from "@/lib/useProgresoStore";
+
+// Circunferencia del anillo de progreso (r=15.5): 2 * PI * 15.5
+const CIRCUNFERENCIA_ANILLO = 2 * Math.PI * 15.5;
 
 type NavLink = {
   href: string;
@@ -39,13 +43,22 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  
+  const [progresoMenuOpen, setProgresoMenuOpen] = useState(false);
+  const progresoMenuRef = useRef<HTMLDivElement>(null);
+
   const [initials, setInitials] = useState("DO");
+  // El progreso de onboarding solo aplica a pasantes en curso, no a evaluadores/administradores.
+  const [esPasante, setEsPasante] = useState(false);
+
+  const progreso = useProgresoStore((s) => s.progreso);
+  const progresoCargado = useProgresoStore((s) => s.cargado);
+  const cargarProgreso = useProgresoStore((s) => s.cargar);
 
   if (pathname !== prevPathname) {
     setPrevPathname(pathname);
     setMobileOpen(false);
     setUserMenuOpen(false);
+    setProgresoMenuOpen(false);
   }
 
   useEffect(() => {
@@ -53,17 +66,22 @@ export default function Navbar() {
       const user = authService.getCurrentUser();
       if (user && user.nombre) {
         const nameParts = user.nombre.trim().split(/\s+/);
-        
+
         if (nameParts.length >= 2) {
           setInitials((nameParts[0][0] + nameParts[1][0]).toUpperCase());
         } else if (nameParts.length === 1) {
           setInitials((nameParts[0].substring(0, 2)).toUpperCase());
         }
       }
+      setEsPasante(user?.rol === "nuevo_integrante");
     }, 0);
 
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (esPasante) cargarProgreso();
+  }, [esPasante, cargarProgreso]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -72,6 +90,12 @@ export default function Navbar() {
         !userMenuRef.current.contains(event.target as Node)
       ) {
         setUserMenuOpen(false);
+      }
+      if (
+        progresoMenuRef.current &&
+        !progresoMenuRef.current.contains(event.target as Node)
+      ) {
+        setProgresoMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -111,7 +135,67 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="flex items-center space-x-3 md:order-2 md:space-x-0 rtl:space-x-reverse">
+        <div className="flex items-center space-x-3 md:order-2 rtl:space-x-reverse">
+          {esPasante && progresoCargado ? (
+            <div className="relative" ref={progresoMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProgresoMenuOpen((open) => !open)}
+                aria-expanded={progresoMenuOpen}
+                aria-haspopup="true"
+                className="flex cursor-pointer items-center gap-2 rounded-full border border-default bg-neutral-primary px-2.5 py-1.5 text-xs font-semibold text-heading transition-colors hover:border-brand-orange/40 focus:outline-none focus:ring-4 focus:ring-brand-orange/20"
+              >
+                <svg viewBox="0 0 36 36" className="h-6 w-6 -rotate-90 flex-shrink-0">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--neutral-tertiary)" strokeWidth="4" />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.5"
+                    fill="none"
+                    stroke="var(--brand-orange)"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={CIRCUNFERENCIA_ANILLO}
+                    strokeDashoffset={
+                      CIRCUNFERENCIA_ANILLO -
+                      (Math.min(100, progreso.porcentaje_total) / 100) * CIRCUNFERENCIA_ANILLO
+                    }
+                  />
+                </svg>
+                <span className="hidden sm:inline">{Math.round(progreso.porcentaje_total)}% completado</span>
+                <span className="sm:hidden">{Math.round(progreso.porcentaje_total)}%</span>
+              </button>
+
+              {progresoMenuOpen ? (
+                <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-xl border border-default bg-neutral-primary p-4 shadow-lg">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">
+                    Tu progreso de onboarding
+                  </p>
+                  <div className="mt-3 flex flex-col gap-3">
+                    {[
+                      { etiqueta: "Ecosistema", valor: progreso.porcentaje_ecosistema },
+                      { etiqueta: "Estudio", valor: progreso.porcentaje_estudio },
+                      { etiqueta: "Encuesta", valor: progreso.porcentaje_encuesta },
+                    ].map((etapa) => (
+                      <div key={etapa.etiqueta}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-heading">{etapa.etiqueta}</span>
+                          <span className="text-brand-gray">{Math.round(etapa.valor)}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-neutral-secondary">
+                          <div
+                            className="h-full rounded-full bg-brand-orange transition-all"
+                            style={{ width: `${Math.min(100, etapa.valor)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="relative" ref={userMenuRef}>
             <button
               type="button"
