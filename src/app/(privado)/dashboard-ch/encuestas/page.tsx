@@ -10,6 +10,7 @@ import {
 } from '@/services/encuestaService';
 import type { Paginacion } from '@/lib/paginacion';
 import Paginador from '@/components/global/Paginador';
+import SessionExpired from '@/components/global/SessionExpired';
 
 const RESULTADOS_POR_PAGINA = 10;
 
@@ -61,6 +62,21 @@ function agruparPorSeccion(resultado: ResultadoEncuesta) {
   return secciones;
 }
 
+// ============================================================================
+// COMPONENTES AUXILIARES DE DISEÑO
+// ============================================================================
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
+      <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+      {children}
+    </div>
+  );
+}
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 export default function EncuestasPage() {
   const [vista, setVista] = useState<'preguntas' | 'resultados'>('preguntas');
 
@@ -83,9 +99,7 @@ export default function EncuestasPage() {
   const [errorResultados, setErrorResultados] = useState<string | null>(null);
   const [intentosResultados, setIntentosResultados] = useState(0);
   const [paginaResultados, setPaginaResultados] = useState(1);
-  const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(
-    null
-  );
+  const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(null);
 
   const cargarPreguntas = () => {
     setCargando(true);
@@ -98,17 +112,13 @@ export default function EncuestasPage() {
   };
 
   useEffect(() => {
-    // Patrón estándar de fetch-con-spinner al montar (react.dev/learn/synchronizing-with-effects#fetching-data).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarPreguntas();
   }, []);
 
-  // Solo pega al backend una vez que se entra a la pestaña; recarga al
-  // cambiar de página o reintentar tras un error.
+  // Recarga resultados
   useEffect(() => {
     if (vista !== 'resultados') return;
     let cancelado = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCargandoResultados(true);
     setErrorResultados(null);
     encuestaService
@@ -202,206 +212,237 @@ export default function EncuestasPage() {
     }
   };
 
+  const esErrorSesionPreguntas = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
+  const esErrorSesionResultados = errorResultados?.toLowerCase().includes('token') || errorResultados?.toLowerCase().includes('expirad');
+
+  // ============================================================================
+  // RENDERIZADO
+  // ============================================================================
   return (
-    <div className="relative mx-auto w-full max-w-screen-xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
+      
+      {/* HEADER ELEGANTE */}
+      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-heading sm:text-3xl">Encuestas</h1>
-          <p className="mt-1 text-sm text-body">
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
+            Gestión de Satisfacción
+          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+            Encuestas
+          </h1>
+          <p className="mt-2 text-base text-gray-500">
             {vista === 'preguntas'
-              ? 'Gestiona las preguntas de la encuesta de satisfacción.'
-              : 'Revisa las respuestas que cada usuario envió.'}
+              ? 'Configura las preguntas de la evaluación de satisfacción.'
+              : 'Revisa las respuestas enviadas por los usuarios.'}
           </p>
         </div>
 
-        {vista === 'preguntas' && (
+        {/* NAVEGACIÓN PRINCIPAL (Toggle) */}
+        <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
           <button
-            onClick={abrirCrear}
-            className="inline-flex items-center justify-center rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-orange/90"
+            onClick={() => setVista('preguntas')}
+            className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+              vista === 'preguntas'
+                ? 'bg-gray-900 text-white shadow-md'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+            }`}
           >
-            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Agregar pregunta
+            Preguntas
           </button>
-        )}
+          <button
+            onClick={() => setVista('resultados')}
+            className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+              vista === 'resultados'
+                ? 'bg-gray-900 text-white shadow-md'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            Resultados
+          </button>
+        </div>
       </header>
 
-      {/* PESTAÑAS: Preguntas vs Resultados */}
-      <div className="mt-6 inline-flex items-center gap-1 rounded-full border border-default bg-neutral-secondary/40 p-1">
-        <button
-          onClick={() => setVista('preguntas')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-            vista === 'preguntas'
-              ? 'bg-white text-brand-orange shadow-sm'
-              : 'text-body hover:text-heading'
-          }`}
-        >
-          Preguntas
-        </button>
-        <button
-          onClick={() => setVista('resultados')}
-          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-            vista === 'resultados'
-              ? 'bg-white text-brand-orange shadow-sm'
-              : 'text-body hover:text-heading'
-          }`}
-        >
-          Resultados
-        </button>
-      </div>
-
+      {/* ============================================================================
+          VISTA: PREGUNTAS
+          ============================================================================ */}
       {vista === 'preguntas' ? (
-        <>
-          {/* PESTAÑAS: "Todas" + las secciones que ya existan en los datos */}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            {['todas', ...secciones].map((seccion) => (
-              <button
-                key={seccion}
-                onClick={() => setSeccionActiva(seccion)}
-                className={`flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition-all ${
-                  seccionActiva === seccion
-                    ? 'border-brand-orange bg-brand-orange text-white'
-                    : 'border-default bg-white text-heading hover:border-brand-orange/50'
-                }`}
-              >
-                {seccion === 'todas' ? 'Todas' : seccion}
-              </button>
-            ))}
-          </div>
-
-      {/* TABLA */}
-      <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
-        {cargando ? (
-          <div className="flex justify-center py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <p className="text-sm font-medium text-heading">No se pudo cargar el listado</p>
-            <p className="max-w-sm text-xs text-body">{error}</p>
+        <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <Eyebrow>Diseño del Formulario</Eyebrow>
             <button
-              onClick={cargarPreguntas}
-              className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              onClick={abrirCrear}
+              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
             >
-              Reintentar
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Agregar Pregunta
             </button>
           </div>
-        ) : preguntasFiltradas.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-1 py-20 text-center text-body">
-            <p className="text-sm font-medium text-heading">No hay preguntas registradas aquí.</p>
-            <p className="text-xs text-body">Usá &quot;Agregar pregunta&quot; para crear la primera.</p>
+
+          {/* PESTAÑAS TIPO PÍLDORA (SECCIONES) - CORREGIDO CON FLEX-WRAP */}
+          <div className="flex flex-wrap w-full pb-6 gap-2.5">
+            {['todas', ...secciones].map((seccion) => {
+              const isActive = seccionActiva === seccion;
+              return (
+                <button
+                  key={seccion}
+                  onClick={() => setSeccionActiva(seccion)}
+                  className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-out ${
+                    isActive
+                      ? 'bg-gray-900 text-white shadow-md shadow-gray-900/20 scale-105'
+                      : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
+                  }`}
+                >
+                  {seccion === 'todas' ? 'Todas' : seccion}
+                </button>
+              );
+            })}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-default bg-neutral-secondary/60 text-xs uppercase tracking-wide text-brand-gray">
-                  <th className="px-5 py-3 font-semibold">Orden</th>
-                  <th className="px-5 py-3 font-semibold">Sección</th>
-                  <th className="px-5 py-3 font-semibold">Pregunta</th>
-                  <th className="px-5 py-3 font-semibold">Tipo</th>
-                  <th className="px-5 py-3 font-semibold">Escala</th>
-                  <th className="px-5 py-3 font-semibold">Obligatoria</th>
-                  <th className="px-5 py-3 font-semibold text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-default">
-                {preguntasFiltradas
-                  .slice()
-                  .sort((a, b) => a.orden - b.orden)
-                  .map((p) => (
-                    <tr key={p.id} className="transition-colors hover:bg-neutral-secondary/40">
-                      <td className="px-5 py-4 text-body">{p.orden}</td>
-                      <td className="px-5 py-4 whitespace-nowrap font-medium text-heading">
-                        {p.seccion}
-                      </td>
-                      <td className="max-w-md px-5 py-4 text-heading">{p.pregunta}</td>
-                      <td className="px-5 py-4 text-body capitalize">{p.tipo_respuesta}</td>
-                      <td className="px-5 py-4 text-body">
-                        {p.tipo_respuesta === 'escala' ? `${p.escala_min}–${p.escala_max}` : '—'}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${
-                            p.obligatoria
-                              ? 'border-green-200 bg-green-50 text-green-700'
-                              : 'border-default bg-neutral-secondary text-brand-gray'
-                          }`}
-                        >
-                          {p.obligatoria ? 'Sí' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => abrirEditar(p)}
-                          className="mr-3 font-medium text-brand-orange hover:text-brand-orange/80"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleEliminar(p)}
-                          className="font-medium text-red-600 hover:text-red-800"
-                        >
-                          Eliminar
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-        </>
-      ) : (
-        <section className="mt-6 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
-          {cargandoResultados ? (
-            <div className="flex justify-center py-16">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+
+          {/* TABLA DE PREGUNTAS */}
+          {cargando ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-24">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+              <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando preguntas...</p>
             </div>
-          ) : errorResultados ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-              <p className="text-sm font-medium text-heading">No se pudo cargar los resultados</p>
-              <p className="max-w-sm text-xs text-body">{errorResultados}</p>
-              <button
-                onClick={() => setIntentosResultados((n) => n + 1)}
-                className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                Reintentar
-              </button>
-            </div>
-          ) : resultados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-1 py-20 text-center text-body">
-              <p className="text-sm font-medium text-heading">Todavía nadie completó la encuesta.</p>
-              <p className="text-xs text-body">Cuando un usuario la responda, va a aparecer acá.</p>
+          ) : error ? (
+            esErrorSesionPreguntas ? (
+              <div className="py-12 flex justify-center"><SessionExpired /></div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+                <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
+                <p className="max-w-sm text-sm text-gray-500">{error}</p>
+                <button onClick={cargarPreguntas} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+              </div>
+            )
+          ) : preguntasFiltradas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+              <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <p className="text-lg font-bold text-gray-900">Sin preguntas registradas</p>
+              <p className="text-sm text-gray-500">Haz clic en "Agregar pregunta" para comenzar.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto mt-4">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-default bg-neutral-secondary/60 text-xs uppercase tracking-wide text-brand-gray">
-                    <th className="px-5 py-3 font-semibold">Usuario</th>
-                    <th className="px-5 py-3 font-semibold">Departamento</th>
-                    <th className="px-5 py-3 font-semibold">Completada</th>
-                    <th className="px-5 py-3 font-semibold text-right">Acciones</th>
+                  <tr className="border-b border-gray-100">
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-center">Orden</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Sección</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Pregunta</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Tipo</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Obligatoria</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-default">
+                <tbody className="divide-y divide-gray-50">
+                  {preguntasFiltradas
+                    .slice()
+                    .sort((a, b) => a.orden - b.orden)
+                    .map((p) => (
+                      <tr key={p.id} className="transition-colors hover:bg-gray-50/50">
+                        <td className="px-4 py-5 text-gray-500 font-bold text-center">{p.orden}</td>
+                        <td className="px-4 py-5 font-bold text-gray-900 whitespace-nowrap">{p.seccion}</td>
+                        <td className="px-4 py-5 font-medium text-gray-600 max-w-md">{p.pregunta}</td>
+                        <td className="px-4 py-5">
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600 capitalize">
+                            {p.tipo_respuesta} {p.tipo_respuesta === 'escala' && `(${p.escala_min}-${p.escala_max})`}
+                          </span>
+                        </td>
+                        <td className="px-4 py-5">
+                          <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-bold shadow-sm ${
+                            p.obligatoria ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {p.obligatoria ? 'Sí' : 'No'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-5 text-right whitespace-nowrap">
+                          <button onClick={() => abrirEditar(p)} className="text-sm font-bold text-brand-orange hover:text-orange-700 mr-4 transition-colors">Editar</button>
+                          <button onClick={() => handleEliminar(p)} className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors">Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : (
+        /* ============================================================================
+           VISTA: RESULTADOS
+           ============================================================================ */
+        <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+          <Eyebrow>Registro de Evaluaciones</Eyebrow>
+
+          {cargandoResultados ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-24">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+              <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando respuestas...</p>
+            </div>
+          ) : errorResultados ? (
+            esErrorSesionResultados ? (
+              <div className="py-12 flex justify-center"><SessionExpired /></div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+                <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+                <p className="text-base font-bold text-gray-900">Error al cargar resultados</p>
+                <p className="max-w-sm text-sm text-gray-500">{errorResultados}</p>
+                <button
+                  onClick={() => setIntentosResultados((n) => n + 1)}
+                  className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md"
+                >
+                  Reintentar
+                </button>
+              </div>
+            )
+          ) : resultados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+              <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m-9 5h12a2 2 0 002-2V6a2 2 0 00-2-2h-2.5a.5.5 0 00-.4.2l-.9 1.2a.5.5 0 01-.4.2h-2.4a.5.5 0 01-.4-.2l-.9-1.2a.5.5 0 00-.4-.2H6a2 2 0 00-2 2v13a2 2 0 002 2z" /></svg>
+              </div>
+              <p className="text-lg font-bold text-gray-900">Sin encuestas completadas</p>
+              <p className="text-sm text-gray-500">Cuando un usuario responda la encuesta, aparecerá aquí.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Usuario</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Completada el</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
                   {resultados.map((r) => (
-                    <tr key={r.id} className="transition-colors hover:bg-neutral-secondary/40">
-                      <td className="px-5 py-4">
-                        <p className="font-medium text-heading">{r.usuario.nombre}</p>
-                        <p className="text-xs text-body">{r.usuario.email}</p>
+                    <tr key={r.id} className="transition-colors hover:bg-gray-50/50">
+                      <td className="px-4 py-5">
+                        <p className="font-bold text-gray-900">{r.usuario.nombre}</p>
+                        <p className="text-xs font-medium text-gray-500 mt-0.5">{r.usuario.email}</p>
                       </td>
-                      <td className="px-5 py-4 text-body">{r.usuario.departamento}</td>
-                      <td className="px-5 py-4 whitespace-nowrap text-body">
+                      <td className="px-4 py-5 font-medium text-gray-600">
+                        {r.usuario.departamento ? (
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            {r.usuario.departamento}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-5 font-medium text-gray-500 whitespace-nowrap">
                         {formatoFecha.format(new Date(r.fecha_completado))}
                       </td>
-                      <td className="px-5 py-4 text-right whitespace-nowrap">
+                      <td className="px-4 py-5 text-right whitespace-nowrap">
                         <button
                           onClick={() => setResultadoSeleccionado(r)}
-                          className="font-medium text-brand-orange hover:text-brand-orange/80"
+                          className="text-sm font-bold text-brand-orange hover:text-orange-700 transition-colors"
                         >
                           Ver respuestas
                         </button>
@@ -412,89 +453,42 @@ export default function EncuestasPage() {
               </table>
             </div>
           )}
+
+          {/* PAGINACIÓN CON EL NUEVO DISEÑO AL 100% WIDTH */}
           {!cargandoResultados && !errorResultados && paginacionResultados && (
-            <Paginador paginacion={paginacionResultados} onCambiarPagina={setPaginaResultados} />
+            <div className="mt-4 pt-5 border-t border-gray-100 w-full">
+              <Paginador paginacion={paginacionResultados} onCambiarPagina={setPaginaResultados} />
+            </div>
           )}
         </section>
       )}
 
-      {/* MODAL: RESPUESTAS DE UN USUARIO */}
-      {resultadoSeleccionado && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-default p-6">
-              <div>
-                <h2 className="text-xl font-bold text-heading">{resultadoSeleccionado.usuario.nombre}</h2>
-                <p className="mt-1 text-sm text-body">{resultadoSeleccionado.usuario.email}</p>
-                <p className="text-xs text-brand-gray">
-                  {resultadoSeleccionado.usuario.departamento} · Completada el{' '}
-                  {formatoFecha.format(new Date(resultadoSeleccionado.fecha_completado))}
-                </p>
-              </div>
-              <button
-                onClick={() => setResultadoSeleccionado(null)}
-                className="rounded-lg p-1.5 text-body hover:bg-neutral-secondary hover:text-heading"
-                aria-label="Cerrar"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="deinsa-scroll overflow-y-auto p-6">
-              {agruparPorSeccion(resultadoSeleccionado).map((grupo) => (
-                <div key={grupo.seccion} className="mb-6 last:mb-0">
-                  <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-brand-orange">
-                    {grupo.seccion}
-                  </h3>
-                  <div className="flex flex-col gap-3">
-                    {grupo.respuestas.map((r) => (
-                      <div key={r.id} className="rounded-xl border border-default p-3.5">
-                        <p className="text-sm font-medium text-heading">{r.pregunta.pregunta}</p>
-                        {r.pregunta.tipo_respuesta === 'texto' ? (
-                          <p className="mt-2 rounded-lg bg-neutral-secondary/60 p-2.5 text-sm text-body italic">
-                            {r.respuesta_texto || 'Sin respuesta.'}
-                          </p>
-                        ) : (
-                          <p className="mt-2 text-sm text-body">
-                            Respuesta:{' '}
-                            <span className="font-bold text-brand-orange">
-                              {r.respuesta_numerica ?? '—'}
-                            </span>
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE CREACIÓN / EDICIÓN */}
+      {/* ============================================================================
+          MODAL: CREACIÓN / EDICIÓN DE PREGUNTA
+          ============================================================================ */}
       {modalAbierto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <h2 className="mb-4 text-xl font-bold text-heading">
-              {editandoId ? 'Editar pregunta' : 'Nueva pregunta'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl overflow-hidden">
+            <h2 className="text-2xl font-extrabold text-gray-900 mb-6">
+              {editandoId ? 'Editar Pregunta' : 'Nueva Pregunta'}
             </h2>
 
             {errorModal && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
+              <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-medium text-red-600 flex items-center gap-3">
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
                 {errorModal}
               </div>
             )}
 
-            <form onSubmit={handleGuardar} className="flex flex-col gap-4">
+            <form onSubmit={handleGuardar} className="flex flex-col gap-5">
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">Sección</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Sección</label>
                 <input
                   type="text"
                   list="secciones-existentes"
-                  className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                   value={formulario.seccion}
                   onChange={(e) => setFormulario({ ...formulario, seccion: e.target.value })}
                   placeholder="Ej. Ambiente laboral"
@@ -508,9 +502,9 @@ export default function EncuestasPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-heading">Pregunta</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Pregunta</label>
                 <textarea
-                  className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                   rows={3}
                   value={formulario.pregunta}
                   onChange={(e) => setFormulario({ ...formulario, pregunta: e.target.value })}
@@ -518,29 +512,25 @@ export default function EncuestasPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-heading">
-                    Tipo de respuesta
-                  </label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Tipo de respuesta</label>
                   <select
-                    className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                     value={formulario.tipo_respuesta}
                     onChange={(e) => cambiarTipoRespuesta(e.target.value as TipoRespuesta)}
                   >
-                    <option value="escala">Escala</option>
-                    <option value="texto">Texto libre</option>
+                    <option value="escala">Escala Numérica</option>
+                    <option value="texto">Texto Libre</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-heading">Orden</label>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Orden</label>
                   <input
                     type="number"
-                    className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                     value={formulario.orden}
-                    onChange={(e) =>
-                      setFormulario({ ...formulario, orden: Number(e.target.value) })
-                    }
+                    onChange={(e) => setFormulario({ ...formulario, orden: Number(e.target.value) })}
                     min={1}
                     required
                   />
@@ -548,68 +538,142 @@ export default function EncuestasPage() {
               </div>
 
               {formulario.tipo_respuesta === 'escala' && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-heading">
-                      Escala mínima
-                    </label>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500 mb-2">Escala Mínima</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                       value={formulario.escala_min ?? ''}
-                      onChange={(e) =>
-                        setFormulario({ ...formulario, escala_min: Number(e.target.value) })
-                      }
+                      onChange={(e) => setFormulario({ ...formulario, escala_min: Number(e.target.value) })}
                       required
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-heading">
-                      Escala máxima
-                    </label>
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500 mb-2">Escala Máxima</label>
                     <input
                       type="number"
-                      className="w-full rounded-lg border border-default p-2.5 text-sm outline-none focus:border-brand-orange"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                       value={formulario.escala_max ?? ''}
-                      onChange={(e) =>
-                        setFormulario({ ...formulario, escala_max: Number(e.target.value) })
-                      }
+                      onChange={(e) => setFormulario({ ...formulario, escala_max: Number(e.target.value) })}
                       required
                     />
                   </div>
                 </div>
               )}
 
-              <label className="flex items-center gap-2.5 text-sm font-medium text-heading">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-default text-brand-orange focus:ring-brand-orange"
-                  checked={formulario.obligatoria}
-                  onChange={(e) =>
-                    setFormulario({ ...formulario, obligatoria: e.target.checked })
-                  }
-                />
-                Pregunta obligatoria
-              </label>
+              <div className="mt-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={formulario.obligatoria}
+                      onChange={(e) => setFormulario({ ...formulario, obligatoria: e.target.checked })}
+                    />
+                    <div className="w-5 h-5 rounded border-2 border-gray-300 peer-checked:bg-brand-orange peer-checked:border-brand-orange transition-all"></div>
+                    <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Esta pregunta es obligatoria</span>
+                </label>
+              </div>
 
-              <div className="mt-2 flex justify-end gap-3">
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100 pt-6">
                 <button
                   type="button"
                   onClick={cerrarModal}
-                  className="rounded-lg px-4 py-2 text-sm font-semibold text-body hover:bg-neutral-secondary"
+                  className="rounded-xl px-6 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors w-full sm:w-auto"
                   disabled={guardando}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange/90 disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-6 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all w-full sm:w-auto disabled:opacity-50"
                   disabled={guardando}
                 >
-                  {guardando ? 'Guardando...' : 'Guardar'}
+                  {guardando ? 'Guardando...' : 'Guardar Pregunta'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================================
+          MODAL: DETALLES DE RESPUESTA DE UN USUARIO
+          ============================================================================ */}
+      {resultadoSeleccionado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden">
+            
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-8 bg-white z-10">
+              <div>
+                <h2 className="text-2xl font-extrabold text-gray-900 mb-1">{resultadoSeleccionado.usuario.nombre}</h2>
+                <p className="text-sm font-medium text-gray-500 mb-2">{resultadoSeleccionado.usuario.email}</p>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600">
+                    {resultadoSeleccionado.usuario.departamento}
+                  </span>
+                  <span className="text-xs font-medium text-gray-400">
+                    Enviado el {formatoFecha.format(new Date(resultadoSeleccionado.fecha_completado))}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setResultadoSeleccionado(null)}
+                className="rounded-full p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                aria-label="Cerrar"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="deinsa-scroll overflow-y-auto p-8 bg-[#f8f9fa]">
+              {agruparPorSeccion(resultadoSeleccionado).map((grupo) => (
+                <div key={grupo.seccion} className="mb-10 last:mb-0">
+                  <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange mb-4">
+                    <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+                    {grupo.seccion}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    {grupo.respuestas.map((r) => (
+                      <div key={r.id} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <p className="text-base font-bold text-gray-900 mb-4">{r.pregunta.pregunta}</p>
+                        
+                        {r.pregunta.tipo_respuesta === 'texto' ? (
+                          <div className="rounded-xl bg-gray-50 p-4 border border-gray-100">
+                            <p className="text-sm text-gray-700 italic">
+                              "{r.respuesta_texto || 'No se proporcionó respuesta.'}"
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <div className="flex items-center gap-4">
+                              <div className="h-3 flex-1 overflow-hidden rounded-full bg-gray-100 shadow-inner">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-brand-orange to-[#f97316]"
+                                  style={{ width: `${Math.round(((r.respuesta_numerica ?? 0) / ((r.pregunta as any).escala_max ?? 5)) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="w-16 shrink-0 text-right text-sm font-black text-gray-900">
+                                {r.respuesta_numerica ?? 0} <span className="text-xs font-bold text-gray-400">/ {(r.pregunta as any).escala_max ?? 5}</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
           </div>
         </div>
       )}

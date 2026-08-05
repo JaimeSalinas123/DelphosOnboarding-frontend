@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Delphos Onboarding",
   description: "Onboarding de la Suite Delphos de DEINSA Global",
+  icons: {
+    icon: "/images/logo.svg",
+    shortcut: "/images/logo.svg",
+    apple: "/images/logo.svg",
+  },
 };
 
 export default function RootLayout({

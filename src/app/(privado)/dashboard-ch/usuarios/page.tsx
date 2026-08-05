@@ -11,10 +11,24 @@ import { etiquetaRol } from '@/lib/roles';
 import { DEPARTAMENTOS } from '@/lib/departamentos';
 import type { Paginacion } from '@/lib/paginacion';
 import Paginador from '@/components/global/Paginador';
+import SessionExpired from '@/components/global/SessionExpired';
 
 const USUARIOS_POR_PAGINA = 10;
 
-/** Roles que el toggle de la tabla entiende; todo lo demás (ej. 'evaluador') se ve como badge fijo. */
+// ============================================================================
+// COMPONENTES AUXILIARES Y DE DISEÑO
+// ============================================================================
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
+      <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+      {children}
+    </div>
+  );
+}
+
+/** Roles que el toggle de la tabla entiende */
 function esRolEditable(rol: string): rol is RolEditable {
   return rol === 'nuevo_integrante' || rol === 'administrador';
 }
@@ -40,33 +54,34 @@ function ToggleRol({
         role="switch"
         aria-checked={esAdmin}
         aria-label={`Cambiar rol de ${usuario.nombre}`}
-        title={esUsuarioActual ? 'No podés cambiar tu propio rol' : undefined}
+        title={esUsuarioActual ? 'No puedes cambiar tu propio rol' : undefined}
         disabled={deshabilitado}
         onClick={() => onCambiar(esAdmin ? 'nuevo_integrante' : 'administrador')}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-40 ${
-          esAdmin ? 'bg-brand-orange' : 'bg-slate-300'
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-orange/50 focus:ring-offset-1 shadow-inner disabled:cursor-not-allowed disabled:opacity-40 ${
+          esAdmin ? 'bg-brand-orange' : 'bg-gray-200'
         }`}
       >
         <span
           aria-hidden="true"
-          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition-transform duration-300 ease-in-out ${
             esAdmin ? 'translate-x-5' : 'translate-x-0'
           }`}
         />
       </button>
-      <span className="text-xs font-medium text-body">
+      <span className="text-xs font-semibold text-gray-600">
         {cargando
           ? 'Actualizando…'
           : esUsuarioActual
-            ? `${etiquetaRol(usuario.rol)} · tú`
+            ? `${etiquetaRol(usuario.rol)} · Tú`
             : etiquetaRol(usuario.rol)}
       </span>
     </div>
   );
 }
 
-const selectClass =
-  'rounded-lg border border-default bg-neutral-primary px-4 py-2.5 text-sm text-heading outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20';
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 export default function UsuariosPage() {
   const { user: usuarioActual } = useAuth();
@@ -90,7 +105,7 @@ export default function UsuariosPage() {
     !!usuarioActual &&
     usuarioActual.email.toLowerCase() === usuario.email.toLowerCase();
 
-  // Espera a que el usuario deje de tipear antes de pegarle al backend.
+  // Espera a que el usuario deje de tipear antes de pegar al backend.
   useEffect(() => {
     const id = setTimeout(() => {
       setBusquedaDebounced(busqueda.trim());
@@ -99,14 +114,9 @@ export default function UsuariosPage() {
     return () => clearTimeout(id);
   }, [busqueda]);
 
-  // Recarga cuando cambia el filtro por departamento, la búsqueda (ya
-  // debounced), la página o cuando se pide reintentar tras un error.
+  // Recarga cuando cambia el filtro, página o tras reintentar.
   useEffect(() => {
     let cancelado = false;
-    // El flag de carga/error se resetea al iniciar cada pedido: es el
-    // patrón estándar de fetch-con-spinner (react.dev/learn/synchronizing-with-effects#fetching-data);
-    // la regla nueva de React Compiler lo marca como "derived state" pero acá es intencional.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCargando(true);
     setError(null);
     usuarioService
@@ -145,14 +155,13 @@ export default function UsuariosPage() {
   };
 
   const cambiarRol = async (usuario: UsuarioListado, nuevoRol: RolEditable) => {
-    // Defensa extra: aunque el switch ya viene deshabilitado para tu propia
-    // fila, no permitir el cambio si de alguna forma se llega a llamar igual.
     if (esUsuarioActual(usuario)) return;
 
     const rolAnterior = usuario.rol;
     setActualizandoId(usuario.id);
     setErrorFila(null);
-    // Optimista: refleja el cambio ya, y lo revierte si el backend lo rechaza.
+    
+    // Optimista
     setUsuarios((prev) =>
       prev.map((u) => (u.id === usuario.id ? { ...u, rol: nuevoRol } : u))
     );
@@ -179,110 +188,162 @@ export default function UsuariosPage() {
     return diff !== 0 ? diff : a.nombre.localeCompare(b.nombre, 'es');
   });
 
+  // Verificación de expiración de sesión
+  const esErrorSesion = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
+
+  // ============================================================================
+  // RENDERIZADO
+  // ============================================================================
+
   return (
-    <div className="mx-auto w-full max-w-screen-xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex items-center justify-between">
+    <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
+      
+      {/* HEADER ELEGANTE */}
+      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-heading sm:text-3xl">Usuarios</h1>
-          <p className="mt-1 text-sm text-body">
-            Usuarios registrados en Delphos Onboarding.
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
+            Gestión de Personal
+          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+            Usuarios
+          </h1>
+          <p className="mt-2 text-base text-gray-500">
+            Directorio y control de accesos de Delphos Onboarding.
           </p>
         </div>
+        
         {!cargando && !error && paginacion && (
-          <span className="rounded-full bg-neutral-secondary px-3 py-1 text-xs font-medium text-body">
-            {paginacion.total} {paginacion.total === 1 ? 'usuario' : 'usuarios'}
-          </span>
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-3">Total Registrados</span>
+            <span className="text-base font-black text-gray-900">{paginacion.total}</span>
+          </div>
         )}
       </header>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre..."
-          className="flex-1 rounded-lg border border-default bg-neutral-primary px-4 py-2.5 text-sm text-heading placeholder:text-body/50 outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20"
-        />
-        <select
-          value={departamentoFiltro}
-          onChange={(e) => cambiarDepartamentoFiltro(e.target.value)}
-          className={`${selectClass} sm:w-56`}
-        >
-          <option value="">Todos los departamentos</option>
-          {DEPARTAMENTOS.map((dep) => (
-            <option key={dep} value={dep}>
-              {dep}
-            </option>
-          ))}
-        </select>
-        {hayFiltrosActivos && (
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="text-xs font-medium text-brand-gray transition-colors hover:text-brand-orange"
-          >
-            Limpiar filtros
-          </button>
-        )}
-      </div>
+      {/* CONTENEDOR PRINCIPAL TIPO TARJETA */}
+      <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+        <Eyebrow>Directorio</Eyebrow>
 
-      {errorFila && (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
-          No se pudo actualizar el rol: {errorFila}
-        </div>
-      )}
-
-      <section className="mt-4 overflow-hidden rounded-2xl border border-default bg-neutral-primary shadow-sm">
-        {cargando ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
-            <p className="text-sm text-body">Cargando usuarios...</p>
+        {/* BARRA DE FILTROS */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre..."
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-11 pr-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+            />
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-            <p className="text-sm font-medium text-heading">
-              No se pudo cargar el listado
-            </p>
-            <p className="max-w-sm text-xs text-body">{error}</p>
+          
+          <select
+            value={departamentoFiltro}
+            onChange={(e) => cambiarDepartamentoFiltro(e.target.value)}
+            className="w-full sm:w-64 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+          >
+            <option value="">Todos los departamentos</option>
+            {DEPARTAMENTOS.map((dep) => (
+              <option key={dep} value={dep}>
+                {dep}
+              </option>
+            ))}
+          </select>
+          
+          {hayFiltrosActivos && (
             <button
               type="button"
-              onClick={() => setIntentos((n) => n + 1)}
-              className="mt-1 rounded-lg bg-brand-orange px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              onClick={limpiarFiltros}
+              className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
             >
-              Reintentar
+              Limpiar filtros
             </button>
+          )}
+        </div>
+
+        {/* ALERTA DE ERROR AL ACTUALIZAR FILA */}
+        {errorFila && (
+          <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-medium text-red-600 flex items-center gap-3">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            No se pudo actualizar el rol: {errorFila}
           </div>
+        )}
+
+        {/* CONTENIDO (Tabla, Spinners o Errores) */}
+        {cargando ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-24">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+            <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando directorio...</p>
+          </div>
+        ) : error ? (
+          esErrorSesion ? (
+            <div className="py-12 flex justify-center">
+              <SessionExpired />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <p className="text-base font-bold text-gray-900">No se pudo cargar el listado</p>
+              <p className="max-w-sm text-sm text-gray-500">{error}</p>
+              <button
+                type="button"
+                onClick={() => setIntentos((n) => n + 1)}
+                className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md"
+              >
+                Reintentar
+              </button>
+            </div>
+          )
         ) : usuarios.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-1 py-16 text-center">
-            <p className="text-sm font-medium text-heading">
-              {hayFiltrosActivos
-                ? 'Ningún usuario coincide con el filtro'
-                : 'Todavía no hay usuarios registrados'}
+          <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+            <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <p className="text-lg font-bold text-gray-900">
+              {hayFiltrosActivos ? 'Sin coincidencias' : 'Directorio vacío'}
             </p>
-            <p className="text-xs text-body">
+            <p className="text-sm text-gray-500 max-w-sm">
               {hayFiltrosActivos
-                ? 'Probá con otro nombre o departamento.'
-                : 'Los nuevos registros van a aparecer acá.'}
+                ? 'No encontramos ningún usuario que coincida con tu búsqueda. Intenta con otros filtros.'
+                : 'Los nuevos usuarios registrados aparecerán aquí.'}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-default bg-neutral-secondary/60 text-xs uppercase tracking-wide text-brand-gray">
-                  <th className="px-5 py-3 font-semibold">Nombre</th>
-                  <th className="px-5 py-3 font-semibold">Correo</th>
-                  <th className="px-5 py-3 font-semibold">Departamento</th>
-                  <th className="px-5 py-3 font-semibold">Rol</th>
+                <tr className="border-b border-gray-100">
+                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nombre</th>
+                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Correo Electrónico</th>
+                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
+                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Rol & Accesos</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-default">
+              <tbody className="divide-y divide-gray-50">
                 {usuariosOrdenados.map((usuario) => (
-                  <tr key={usuario.id} className="transition-colors hover:bg-neutral-secondary/40">
-                    <td className="px-5 py-3 font-medium text-heading">{usuario.nombre}</td>
-                    <td className="px-5 py-3 text-body">{usuario.email}</td>
-                    <td className="px-5 py-3 text-body">{usuario.departamento || '—'}</td>
-                    <td className="px-5 py-3">
+                  <tr key={usuario.id} className="transition-colors hover:bg-gray-50/50">
+                    <td className="px-4 py-5 font-bold text-gray-900">{usuario.nombre}</td>
+                    <td className="px-4 py-5 font-medium text-gray-500">{usuario.email}</td>
+                    <td className="px-4 py-5 font-medium text-gray-500">
+                      {usuario.departamento ? (
+                        <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                          {usuario.departamento}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-5">
                       {puedeEditarRoles && esRolEditable(usuario.rol) ? (
                         <ToggleRol
                           usuario={usuario}
@@ -291,7 +352,7 @@ export default function UsuariosPage() {
                           onCambiar={(nuevoRol) => cambiarRol(usuario, nuevoRol)}
                         />
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-2.5 py-1 text-xs font-medium text-brand-orange">
+                        <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20">
                           {etiquetaRol(usuario.rol)}
                         </span>
                       )}
@@ -302,8 +363,12 @@ export default function UsuariosPage() {
             </table>
           </div>
         )}
+
+        {/* PAGINACIÓN E IMPORTACIÓN */}
         {!cargando && !error && paginacion && (
-          <Paginador paginacion={paginacion} onCambiarPagina={setPagina} />
+          <div className="mt-6 pt-6 border-t border-gray-100 flex justify-end">
+            <Paginador paginacion={paginacion} onCambiarPagina={setPagina} />
+          </div>
         )}
       </section>
     </div>
