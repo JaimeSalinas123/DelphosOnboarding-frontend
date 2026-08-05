@@ -11,6 +11,7 @@ import {
 import type { Paginacion } from '@/lib/paginacion';
 import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
+import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
 const RESULTADOS_POR_PAGINA = 10;
 
@@ -100,6 +101,13 @@ export default function EncuestasPage() {
   const [intentosResultados, setIntentosResultados] = useState(0);
   const [paginaResultados, setPaginaResultados] = useState(1);
   const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(null);
+  const [seccionDetalle, setSeccionDetalle] = useState('todas');
+
+  // Filtros del listado de resultados.
+  const [departamentoResultados, setDepartamentoResultados] = useState('');
+  const [fechaDesdeResultados, setFechaDesdeResultados] = useState('');
+  const [fechaHastaResultados, setFechaHastaResultados] = useState('');
+  const hayFiltrosResultados = !!departamentoResultados || !!fechaDesdeResultados || !!fechaHastaResultados;
 
   const cargarPreguntas = () => {
     setCargando(true);
@@ -122,7 +130,13 @@ export default function EncuestasPage() {
     setCargandoResultados(true);
     setErrorResultados(null);
     encuestaService
-      .obtenerResultados({ pagina: paginaResultados, limite: RESULTADOS_POR_PAGINA })
+      .obtenerResultados({
+        pagina: paginaResultados,
+        limite: RESULTADOS_POR_PAGINA,
+        departamento: departamentoResultados || undefined,
+        fechaDesde: fechaDesdeResultados || undefined,
+        fechaHasta: fechaHastaResultados || undefined,
+      })
       .then((data) => {
         if (cancelado) return;
         setResultados(data.resultados);
@@ -137,7 +151,41 @@ export default function EncuestasPage() {
     return () => {
       cancelado = true;
     };
-  }, [vista, paginaResultados, intentosResultados]);
+  }, [
+    vista,
+    paginaResultados,
+    intentosResultados,
+    departamentoResultados,
+    fechaDesdeResultados,
+    fechaHastaResultados,
+  ]);
+
+  const cambiarDepartamentoResultados = (valor: string) => {
+    setDepartamentoResultados(valor);
+    setPaginaResultados(1);
+  };
+
+  const cambiarFechaDesdeResultados = (valor: string) => {
+    setFechaDesdeResultados(valor);
+    setPaginaResultados(1);
+  };
+
+  const cambiarFechaHastaResultados = (valor: string) => {
+    setFechaHastaResultados(valor);
+    setPaginaResultados(1);
+  };
+
+  const limpiarFiltrosResultados = () => {
+    setDepartamentoResultados('');
+    setFechaDesdeResultados('');
+    setFechaHastaResultados('');
+    setPaginaResultados(1);
+  };
+
+  const abrirDetalleResultado = (r: ResultadoEncuesta) => {
+    setResultadoSeleccionado(r);
+    setSeccionDetalle('todas');
+  };
 
   const secciones = useMemo(
     () => Array.from(new Set(preguntas.map((p) => p.seccion))),
@@ -380,6 +428,47 @@ export default function EncuestasPage() {
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <Eyebrow>Registro de Evaluaciones</Eyebrow>
 
+          {/* BARRA DE FILTROS */}
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+            <SelectorDepartamento
+              value={departamentoResultados}
+              onChange={cambiarDepartamentoResultados}
+              className="w-full sm:w-56 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+            />
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Desde</label>
+              <input
+                type="date"
+                value={fechaDesdeResultados}
+                onChange={(e) => cambiarFechaDesdeResultados(e.target.value)}
+                max={fechaHastaResultados || undefined}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-400">Hasta</label>
+              <input
+                type="date"
+                value={fechaHastaResultados}
+                onChange={(e) => cambiarFechaHastaResultados(e.target.value)}
+                min={fechaDesdeResultados || undefined}
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+              />
+            </div>
+
+            {hayFiltrosResultados && (
+              <button
+                type="button"
+                onClick={limpiarFiltrosResultados}
+                className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+
           {cargandoResultados ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -408,8 +497,14 @@ export default function EncuestasPage() {
               <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m-9 5h12a2 2 0 002-2V6a2 2 0 00-2-2h-2.5a.5.5 0 00-.4.2l-.9 1.2a.5.5 0 01-.4.2h-2.4a.5.5 0 01-.4-.2l-.9-1.2a.5.5 0 00-.4-.2H6a2 2 0 00-2 2v13a2 2 0 002 2z" /></svg>
               </div>
-              <p className="text-lg font-bold text-gray-900">Sin encuestas completadas</p>
-              <p className="text-sm text-gray-500">Cuando un usuario responda la encuesta, aparecerá aquí.</p>
+              <p className="text-lg font-bold text-gray-900">
+                {hayFiltrosResultados ? 'Sin coincidencias' : 'Sin encuestas completadas'}
+              </p>
+              <p className="text-sm text-gray-500">
+                {hayFiltrosResultados
+                  ? 'Ningún resultado coincide con estos filtros. Probá con otro departamento o rango de fecha.'
+                  : 'Cuando un usuario responda la encuesta, aparecerá aquí.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto mt-4">
@@ -441,7 +536,7 @@ export default function EncuestasPage() {
                       </td>
                       <td className="px-4 py-5 text-right whitespace-nowrap">
                         <button
-                          onClick={() => setResultadoSeleccionado(r)}
+                          onClick={() => abrirDetalleResultado(r)}
                           className="text-sm font-bold text-brand-orange hover:text-orange-700 transition-colors"
                         >
                           Ver respuestas
@@ -633,8 +728,32 @@ export default function EncuestasPage() {
               </button>
             </div>
 
+            {/* PESTAÑAS TIPO PÍLDORA (SECCIONES DE LA RESPUESTA) */}
+            <div className="flex flex-wrap gap-2.5 border-b border-gray-100 bg-white px-8 py-4">
+              {['todas', ...agruparPorSeccion(resultadoSeleccionado).map((g) => g.seccion)].map(
+                (seccion) => {
+                  const isActive = seccionDetalle === seccion;
+                  return (
+                    <button
+                      key={seccion}
+                      onClick={() => setSeccionDetalle(seccion)}
+                      className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all duration-300 ease-out ${
+                        isActive
+                          ? 'bg-gray-900 text-white shadow-md shadow-gray-900/20'
+                          : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
+                      }`}
+                    >
+                      {seccion === 'todas' ? 'Todas' : seccion}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+
             <div className="deinsa-scroll overflow-y-auto p-8 bg-[#f8f9fa]">
-              {agruparPorSeccion(resultadoSeleccionado).map((grupo) => (
+              {agruparPorSeccion(resultadoSeleccionado)
+                .filter((grupo) => seccionDetalle === 'todas' || grupo.seccion === seccionDetalle)
+                .map((grupo) => (
                 <div key={grupo.seccion} className="mb-10 last:mb-0">
                   <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange mb-4">
                     <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />

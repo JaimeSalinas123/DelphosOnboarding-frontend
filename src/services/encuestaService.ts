@@ -69,6 +69,12 @@ export interface FiltrosResultados {
   pagina?: number;
   /** Tamaño de página. El backend por defecto usa 10, tope 100. */
   limite?: number;
+  /** Coincidencia exacta contra el departamento del usuario. */
+  departamento?: string;
+  /** Fecha mínima de finalización, formato YYYY-MM-DD (inclusive). */
+  fechaDesde?: string;
+  /** Fecha máxima de finalización, formato YYYY-MM-DD (inclusive, incluye todo el día). */
+  fechaHasta?: string;
 }
 
 export interface ListadoResultados {
@@ -154,6 +160,9 @@ export const encuestaService = {
     const params = new URLSearchParams();
     if (filtros.pagina) params.set('pagina', String(filtros.pagina));
     if (filtros.limite) params.set('limite', String(filtros.limite));
+    if (filtros.departamento) params.set('departamento', filtros.departamento);
+    if (filtros.fechaDesde) params.set('fechaDesde', filtros.fechaDesde);
+    if (filtros.fechaHasta) params.set('fechaHasta', filtros.fechaHasta);
     const query = params.toString();
 
     const response = await authFetch(`/satisfaccion/resultados${query ? `?${query}` : ''}`, {

@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
+import { useProgresoStore } from '../lib/useProgresoStore';
 
 /**
  * Perfil del usuario autenticado. `rol` se deja como `string` (no un union
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     authService.logout();
+    useProgresoStore.getState().resetear();
     setUser(null);
   };
 

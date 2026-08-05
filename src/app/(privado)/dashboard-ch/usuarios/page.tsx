@@ -7,11 +7,12 @@ import {
   type RolEditable,
   type UsuarioListado,
 } from '@/services/usuarioService';
+import { progresoService, type ProgresoPasante } from '@/services/progresoService';
 import { etiquetaRol } from '@/lib/roles';
-import { DEPARTAMENTOS } from '@/lib/departamentos';
 import type { Paginacion } from '@/lib/paginacion';
 import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
+import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
 const USUARIOS_POR_PAGINA = 10;
 
@@ -79,6 +80,107 @@ function ToggleRol({
   );
 }
 
+function BarraProgreso({ valor, alto = 'h-1.5' }: { valor: number; alto?: string }) {
+  return (
+    <div className={`w-full overflow-hidden rounded-full bg-gray-100 ${alto}`}>
+      <div
+        className="h-full rounded-full bg-brand-orange transition-all"
+        style={{ width: `${Math.min(100, Math.max(0, valor))}%` }}
+      />
+    </div>
+  );
+}
+
+function CeldaProgreso({
+  progreso,
+  cargando,
+  onVerDetalle,
+}: {
+  progreso: ProgresoPasante | undefined;
+  cargando: boolean;
+  onVerDetalle: (p: ProgresoPasante) => void;
+}) {
+  if (cargando) {
+    return <span className="text-xs text-gray-400">Cargando…</span>;
+  }
+  if (!progreso) {
+    return <span className="text-xs text-gray-400">—</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onVerDetalle(progreso)}
+      className="group flex w-full max-w-[160px] flex-col gap-1.5 text-left"
+    >
+      <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+        <span>{Math.round(progreso.porcentaje_total)}%</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-brand-orange opacity-0 transition-opacity group-hover:opacity-100">
+          Ver detalle
+        </span>
+      </div>
+      <BarraProgreso valor={progreso.porcentaje_total} />
+    </button>
+  );
+}
+
+const ETAPAS_PROGRESO = [
+  { clave: 'porcentaje_ecosistema' as const, etiqueta: 'Ecosistema' },
+  { clave: 'porcentaje_estudio' as const, etiqueta: 'Estudio' },
+  { clave: 'porcentaje_encuesta' as const, etiqueta: 'Encuesta' },
+];
+
+function ModalDetalleProgreso({
+  progreso,
+  onCerrar,
+}: {
+  progreso: ProgresoPasante;
+  onCerrar: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{progreso.nombre ?? 'Progreso'}</h2>
+            {progreso.email && <p className="text-sm text-gray-500">{progreso.email}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            aria-label="Cerrar"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-4">
+          {ETAPAS_PROGRESO.map((etapa) => (
+            <div key={etapa.clave}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-gray-700">{etapa.etiqueta}</span>
+                <span className="text-gray-500">{Math.round(progreso[etapa.clave])}%</span>
+              </div>
+              <div className="mt-1.5">
+                <BarraProgreso valor={progreso[etapa.clave]} alto="h-2" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+          <span className="text-sm font-bold text-gray-900">Progreso total</span>
+          <span className="text-lg font-black text-brand-orange">
+            {Math.round(progreso.porcentaje_total)}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
@@ -97,6 +199,34 @@ export default function UsuariosPage() {
   const [intentos, setIntentos] = useState(0);
   const [pagina, setPagina] = useState(1);
   const [paginacion, setPaginacion] = useState<Paginacion | null>(null);
+
+  // Progreso por usuario (Ecosistema/Estudio/Encuesta), cruzado por usuario_id.
+  // Se carga completo una sola vez porque pagina distinto a la tabla de usuarios.
+  const [progresoPorUsuario, setProgresoPorUsuario] = useState<Map<string, ProgresoPasante>>(
+    new Map()
+  );
+  const [cargandoProgreso, setCargandoProgreso] = useState(true);
+  const [detalleProgreso, setDetalleProgreso] = useState<ProgresoPasante | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    progresoService
+      .listarTodoAdmin()
+      .then((data) => {
+        if (cancelado) return;
+        setProgresoPorUsuario(new Map(data.map((p) => [p.usuario_id, p])));
+      })
+      .catch(() => {
+        // El progreso es un dato complementario: si falla, la tabla de
+        // usuarios sigue funcionando, solo se ve "—" en esa columna.
+      })
+      .finally(() => {
+        if (!cancelado) setCargandoProgreso(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const puedeEditarRoles = usuarioActual?.rol === 'administrador';
   const hayFiltrosActivos = !!busqueda || !!departamentoFiltro;
@@ -241,19 +371,8 @@ export default function UsuariosPage() {
             />
           </div>
           
-          <select
-            value={departamentoFiltro}
-            onChange={(e) => cambiarDepartamentoFiltro(e.target.value)}
-            className="w-full sm:w-64 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
-          >
-            <option value="">Todos los departamentos</option>
-            {DEPARTAMENTOS.map((dep) => (
-              <option key={dep} value={dep}>
-                {dep}
-              </option>
-            ))}
-          </select>
-          
+          <SelectorDepartamento value={departamentoFiltro} onChange={cambiarDepartamentoFiltro} />
+
           {hayFiltrosActivos && (
             <button
               type="button"
@@ -326,6 +445,7 @@ export default function UsuariosPage() {
                   <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nombre</th>
                   <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Correo Electrónico</th>
                   <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
+                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Progreso</th>
                   <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Rol & Accesos</th>
                 </tr>
               </thead>
@@ -342,6 +462,13 @@ export default function UsuariosPage() {
                       ) : (
                         '—'
                       )}
+                    </td>
+                    <td className="px-4 py-5">
+                      <CeldaProgreso
+                        progreso={progresoPorUsuario.get(usuario.id)}
+                        cargando={cargandoProgreso}
+                        onVerDetalle={setDetalleProgreso}
+                      />
                     </td>
                     <td className="px-4 py-5">
                       {puedeEditarRoles && esRolEditable(usuario.rol) ? (
@@ -371,6 +498,13 @@ export default function UsuariosPage() {
           </div>
         )}
       </section>
+
+      {detalleProgreso && (
+        <ModalDetalleProgreso
+          progreso={detalleProgreso}
+          onCerrar={() => setDetalleProgreso(null)}
+        />
+      )}
     </div>
   );
 }

@@ -112,6 +112,7 @@ export default function Navbar() {
   const handleLogoutClick = (href: string) => {
     if (href === "/login") {
       authService.logout();
+      useProgresoStore.getState().resetear();
     }
     setUserMenuOpen(false);
   };

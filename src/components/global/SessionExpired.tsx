@@ -2,12 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
+import { useProgresoStore } from '@/lib/useProgresoStore';
 
 export default function SessionExpired() {
   const router = useRouter();
 
   const handleRedirigirLogin = () => {
     authService.logout(); // Limpiamos la basura del local storage
+    useProgresoStore.getState().resetear();
     router.push('/login'); // Lo mandamos de regreso
   };
 

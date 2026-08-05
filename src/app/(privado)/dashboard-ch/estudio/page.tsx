@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { estudioService, type Pregunta } from '@/services/estudioService';
 import SessionExpired from '@/components/global/SessionExpired';
 import Paginador from '@/components/global/Paginador';
+import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
 type ModoEstudio = 'cuestionario' | 'flashcard' | 'verdadero_falso';
 type VistaEstudio = 'preguntas' | 'resultados';
@@ -91,6 +92,7 @@ export default function EstudioPage() {
   
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<UsuarioAgrupado | null>(null);
   const [paginaResultados, setPaginaResultados] = useState(1);
+  const [departamentoFiltro, setDepartamentoFiltro] = useState('');
 
   // EFECTOS Y CARGA DE DATOS
   useEffect(() => {
@@ -142,6 +144,11 @@ export default function EstudioPage() {
     if (v === 'resultados' && !resultadosCargados && !cargandoResultados) {
       cargarResultados();
     }
+  };
+
+  const cambiarDepartamentoFiltro = (valor: string) => {
+    setDepartamentoFiltro(valor);
+    setPaginaResultados(1);
   };
 
   // ============================================================================
@@ -240,10 +247,15 @@ export default function EstudioPage() {
     });
   };
 
+  const resultadosFiltrados = useMemo(() => {
+    if (!departamentoFiltro) return resultadosAgrupados;
+    return resultadosAgrupados.filter((u) => u.departamento === departamentoFiltro);
+  }, [resultadosAgrupados, departamentoFiltro]);
+
   const resultadosPaginados = useMemo(() => {
     const inicio = (paginaResultados - 1) * RESULTADOS_POR_PAGINA;
-    return resultadosAgrupados.slice(inicio, inicio + RESULTADOS_POR_PAGINA);
-  }, [resultadosAgrupados, paginaResultados]);
+    return resultadosFiltrados.slice(inicio, inicio + RESULTADOS_POR_PAGINA);
+  }, [resultadosFiltrados, paginaResultados]);
 
   // ============================================================================
   // VALIDACIÓN DE SESIÓN ROBUSTA (Atrapa cualquier error de Auth)
@@ -419,7 +431,21 @@ export default function EstudioPage() {
       {vista === 'resultados' && (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <Eyebrow>Registro de Evaluaciones</Eyebrow>
-          
+
+          {/* BARRA DE FILTROS */}
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <SelectorDepartamento value={departamentoFiltro} onChange={cambiarDepartamentoFiltro} />
+            {departamentoFiltro && (
+              <button
+                type="button"
+                onClick={() => cambiarDepartamentoFiltro('')}
+                className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+
           {cargandoResultados ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -438,13 +464,19 @@ export default function EstudioPage() {
                 <button onClick={cargarResultados} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
               </div>
             )
-          ) : resultadosAgrupados.length === 0 ? (
+          ) : resultadosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
               <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
               </div>
-              <p className="text-lg font-bold text-gray-900">Sin evaluaciones</p>
-              <p className="text-sm text-gray-500">Cuando un usuario complete un método de estudio, aparecerá aquí.</p>
+              <p className="text-lg font-bold text-gray-900">
+                {departamentoFiltro ? 'Sin coincidencias' : 'Sin evaluaciones'}
+              </p>
+              <p className="text-sm text-gray-500">
+                {departamentoFiltro
+                  ? 'Ningún usuario de este departamento completó un método de estudio.'
+                  : 'Cuando un usuario complete un método de estudio, aparecerá aquí.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto mt-4">
@@ -491,14 +523,14 @@ export default function EstudioPage() {
               
               {/* PAGINACIÓN */}
               <div className="mt-4 pt-5 border-t border-gray-100 w-full">
-                <Paginador 
+                <Paginador
                   paginacion={{
                     pagina: paginaResultados,
                     limite: RESULTADOS_POR_PAGINA,
-                    total: resultadosAgrupados.length,
-                    totalPaginas: Math.ceil(resultadosAgrupados.length / RESULTADOS_POR_PAGINA)
-                  }} 
-                  onCambiarPagina={setPaginaResultados} 
+                    total: resultadosFiltrados.length,
+                    totalPaginas: Math.ceil(resultadosFiltrados.length / RESULTADOS_POR_PAGINA)
+                  }}
+                  onCambiarPagina={setPaginaResultados}
                 />
               </div>
             </div>

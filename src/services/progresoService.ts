@@ -1,4 +1,5 @@
 import { API_URL, REQUEST_TIMEOUT_MS, authService, handleResponse } from './authService';
+import type { Paginacion } from '@/lib/paginacion';
 
 export interface ProgresoPasante {
   usuario_id: string;
@@ -14,6 +15,18 @@ export interface ProgresoPasante {
 export interface MiProgreso {
   modulosVistos: string[];
   progreso: ProgresoPasante;
+}
+
+export interface FiltrosProgreso {
+  /** Página a pedir (1-indexed). El backend por defecto usa 1. */
+  pagina?: number;
+  /** Tamaño de página. El backend por defecto usa 10, tope 100. */
+  limite?: number;
+}
+
+export interface ListadoProgreso {
+  progreso: ProgresoPasante[];
+  paginacion: Paginacion;
 }
 
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -58,5 +71,30 @@ export const progresoService = {
       body: JSON.stringify({ modulo }),
     });
     await handleResponse(response);
+  },
+
+  // Progreso de todos los usuarios, paginado (solo administradores).
+  obtenerTodosAdmin: async (filtros: FiltrosProgreso = {}): Promise<ListadoProgreso> => {
+    const params = new URLSearchParams();
+    if (filtros.pagina) params.set('pagina', String(filtros.pagina));
+    if (filtros.limite) params.set('limite', String(filtros.limite));
+    const query = params.toString();
+
+    const response = await authFetch(`/progreso${query ? `?${query}` : ''}`, { method: 'GET' });
+    return handleResponse(response);
+  },
+
+  // Trae el progreso de TODOS los usuarios sin paginar, recorriendo todas
+  // las páginas con el límite máximo. Pensado para cruzarlo con la tabla de
+  // Usuarios (que pagina distinto), no para listas gigantes.
+  listarTodoAdmin: async (): Promise<ProgresoPasante[]> => {
+    const LIMITE_MAXIMO = 100;
+    const primera = await progresoService.obtenerTodosAdmin({ pagina: 1, limite: LIMITE_MAXIMO });
+    const progreso = [...primera.progreso];
+    for (let pagina = 2; pagina <= primera.paginacion.totalPaginas; pagina++) {
+      const siguiente = await progresoService.obtenerTodosAdmin({ pagina, limite: LIMITE_MAXIMO });
+      progreso.push(...siguiente.progreso);
+    }
+    return progreso;
   },
 };

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/authService";
+import { useProgresoStore } from "@/lib/useProgresoStore";
 import Navbar from "@/components/global/Navbar";
 import ChatbotFlotante from "@/components/global/ChatbotFlotante";
 import SessionExpired from "@/components/global/SessionExpired";
@@ -33,8 +34,9 @@ export default function PublicoLayout({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
     timeoutRef.current = setTimeout(() => {
-      authService.logout(); 
-      setSessionExpiredMsg(true); 
+      authService.logout();
+      useProgresoStore.getState().resetear();
+      setSessionExpiredMsg(true);
     }, TIEMPO_INACTIVIDAD_MS);
   };
 

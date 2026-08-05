@@ -20,6 +20,9 @@ interface ProgresoState {
   cargar: () => Promise<void>;
   /** El pasante visitó un módulo del ecosistema: actualiza optimista y persiste en el backend. */
   registrarModulo: (modulo: string) => Promise<void>;
+  /** Limpia todo (llamar al cerrar sesión): este store vive mientras dure la pestaña,
+   * no se destruye solo porque el usuario cambie, así que hay que vaciarlo a mano. */
+  resetear: () => void;
 }
 
 export const useProgresoStore = create<ProgresoState>((set, get) => ({
@@ -34,13 +37,19 @@ export const useProgresoStore = create<ProgresoState>((set, get) => ({
     try {
       const data = await progresoService.obtenerMio();
       set((state) => {
-        // Merge, no overwrite: si mientras este pedido viajaba el usuario ya
-        // visitó un módulo nuevo (optimista), no lo pisamos con una respuesta
-        // vieja que todavía no lo incluye — así nunca "retrocede" en pantalla.
-        const modulosVistos = Array.from(new Set([...state.modulosVistos, ...data.modulosVistos]));
+        // Si es el mismo usuario que ya teníamos cargado, mergeamos (no
+        // overwrite) para no perder una visita optimista que todavía no
+        // llegó a esta respuesta. Si es OTRO usuario (login distinto en la
+        // misma pestaña), arrancamos de cero: no tiene sentido combinar el
+        // progreso de dos personas distintas.
+        const esMismoUsuario = state.progreso.usuario_id === data.progreso.usuario_id;
+        const modulosVistosPrevios = esMismoUsuario ? state.modulosVistos : [];
+        const progresoPrevio = esMismoUsuario ? state.progreso : PROGRESO_VACIO;
+
+        const modulosVistos = Array.from(new Set([...modulosVistosPrevios, ...data.modulosVistos]));
         const porcentajeEcosistema = (modulosVistos.length / 8) * 100;
-        const porcentajeEstudio = Math.max(state.progreso.porcentaje_estudio, data.progreso.porcentaje_estudio);
-        const porcentajeEncuesta = Math.max(state.progreso.porcentaje_encuesta, data.progreso.porcentaje_encuesta);
+        const porcentajeEstudio = Math.max(progresoPrevio.porcentaje_estudio, data.progreso.porcentaje_estudio);
+        const porcentajeEncuesta = Math.max(progresoPrevio.porcentaje_encuesta, data.progreso.porcentaje_encuesta);
         return {
           modulosVistos,
           progreso: {
@@ -90,4 +99,6 @@ export const useProgresoStore = create<ProgresoState>((set, get) => ({
       set({ modulosVistos: anterior.modulosVistos, progreso: anterior.progreso });
     }
   },
+
+  resetear: () => set({ progreso: PROGRESO_VACIO, modulosVistos: [], cargando: false, cargado: false }),
 }));
