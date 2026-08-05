@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { authService } from "@/services/authService";
 import Navbar from "@/components/global/Navbar";
 import ChatbotFlotante from "@/components/global/ChatbotFlotante";
-import SessionExpired from "@/components/global/SessionExpired"; // <-- Componente reutilizable importado
+import SessionExpired from "@/components/global/SessionExpired";
+import FooterPublico from "@/components/global/FooterPublico";
 
 export default function PublicoLayout({
   children,
@@ -15,6 +16,8 @@ export default function PublicoLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const mostrarFooter = pathname !== '/ecosistema';
   
   // Estado para controlar si mostramos la pantalla de inactividad
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState(false);
@@ -96,6 +99,8 @@ export default function PublicoLayout({
       <main className="flex flex-1 flex-col pt-[68px]">
         {children}
       </main>
+
+      {mostrarFooter && <FooterPublico />}
 
       {/* El asistente virtual vive exclusivamente en las rutas protegidas */}
       <ChatbotFlotante />

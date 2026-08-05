@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import NavbarPrivado from "@/components/global/NavbarPrivado";
 import SidebarPrivado from "@/components/global/SidebarPrivado";
 
 /** Roles con acceso al panel privado. Único lugar donde se define esta lista. */
@@ -55,12 +54,11 @@ export default function PrivadoLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-secondary">
-      <NavbarPrivado user={user} />
-      <div className="flex flex-1 flex-col md:flex-row">
-        <SidebarPrivado />
-        <main className="flex flex-1 flex-col">{children}</main>
-      </div>
+    <div className="flex min-h-screen flex-col md:flex-row bg-neutral-secondary">
+      {/* El Sidebar ahora es el dueño de la navegación completa */}
+      <SidebarPrivado />
+      {/* Contenedor principal para el contenido */}
+      <main className="flex flex-1 flex-col overflow-x-hidden">{children}</main>
     </div>
   );
 }
