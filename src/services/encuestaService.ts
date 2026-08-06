@@ -153,6 +153,13 @@ export const encuestaService = {
     return handleResponse(response);
   },
 
+  // Si el usuario logueado ya completó la encuesta, para no dejarlo ni
+  // empezarla de nuevo (en vez de descubrirlo recién al enviar).
+  obtenerMiEstado: async (): Promise<{ completada: boolean }> => {
+    const response = await authFetch('/satisfaccion/mi-estado', { method: 'GET' });
+    return handleResponse(response);
+  },
+
   // Resultados de todos los usuarios que completaron la encuesta (solo admin),
   // paginados. Nota: asumo que vive en el mismo router que /preguntas y
   // /encuestas (/api/satisfaccion/resultados). Si está montada aparte, avisame y ajusto.
