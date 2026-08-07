@@ -82,6 +82,11 @@ export interface ListadoResultados {
   paginacion: Paginacion;
 }
 
+export interface CodigoEncuesta {
+  codigo: string;
+  actualizado_en: string;
+}
+
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = authService.getToken();
   const controller = new AbortController();
@@ -153,6 +158,13 @@ export const encuestaService = {
     return handleResponse(response);
   },
 
+  // Si el usuario logueado ya completó la encuesta, para no dejarlo ni
+  // empezarla de nuevo (en vez de descubrirlo recién al enviar).
+  obtenerMiEstado: async (): Promise<{ completada: boolean }> => {
+    const response = await authFetch('/satisfaccion/mi-estado', { method: 'GET' });
+    return handleResponse(response);
+  },
+
   // Resultados de todos los usuarios que completaron la encuesta (solo admin),
   // paginados. Nota: asumo que vive en el mismo router que /preguntas y
   // /encuestas (/api/satisfaccion/resultados). Si está montada aparte, avisame y ajusto.
@@ -183,6 +195,30 @@ export const encuestaService = {
       resultados.push(...siguiente.resultados);
     }
     return resultados;
+  },
+
+  // Código de acceso vigente de la encuesta (solo admin, para el panel de configuración).
+  obtenerCodigo: async (): Promise<CodigoEncuesta> => {
+    const response = await authFetch('/satisfaccion/codigo', { method: 'GET' });
+    return handleResponse(response);
+  },
+
+  // Actualiza el código de acceso (solo admin).
+  actualizarCodigo: async (codigo: string): Promise<CodigoEncuesta> => {
+    const response = await authFetch('/satisfaccion/codigo', {
+      method: 'PUT',
+      body: JSON.stringify({ codigo }),
+    });
+    return handleResponse(response);
+  },
+
+  // El pasante intenta desbloquear la encuesta con un código.
+  verificarCodigo: async (codigo: string): Promise<{ valido: boolean }> => {
+    const response = await authFetch('/satisfaccion/verificar-codigo', {
+      method: 'POST',
+      body: JSON.stringify({ codigo }),
+    });
+    return handleResponse(response);
   },
 };
 
