@@ -53,6 +53,15 @@ const ENLACES = [
       </svg>
     ),
   },
+  {
+    href: '/dashboard-ch/documentacion',
+    label: 'Documentación',
+    icono: (
+      <svg {...ICON_PROPS}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
+      </svg>
+    ),
+  },
 ];
 
 function estaActivo(pathname: string | null, href: string) {
@@ -62,7 +71,6 @@ function estaActivo(pathname: string | null, href: string) {
     : pathname.startsWith(href);
 }
 
-// Función para obtener las iniciales del usuario
 function iniciales(nombre: string) {
   const partes = nombre.trim().split(/\s+/);
   if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
@@ -70,28 +78,23 @@ function iniciales(nombre: string) {
   return 'CH';
 }
 
-/** Navegación del panel privado unificada (Logo + Links + Perfil) */
 export default function SidebarPrivado() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
   
   const [menuDesktopAbierto, setMenuDesktopAbierto] = useState(false);
-  
-  // Estados para móvil
   const [perfilMobileAbierto, setPerfilMobileAbierto] = useState(false);
   const [navMobileAbierto, setNavMobileAbierto] = useState(false);
   
   const menuRefDesktop = useRef<HTMLDivElement>(null);
   const menuRefMobile = useRef<HTMLDivElement>(null);
 
-  // Cierra los menús móviles cuando el usuario hace clic en un link y cambia de página
   useEffect(() => {
     setNavMobileAbierto(false);
     setPerfilMobileAbierto(false);
   }, [pathname]);
 
-  // Cierra el menú al hacer click afuera
   useEffect(() => {
     function alClickearFuera(e: MouseEvent) {
       if (menuRefDesktop.current && !menuRefDesktop.current.contains(e.target as Node)) {
@@ -115,7 +118,6 @@ export default function SidebarPrivado() {
   return (
     <aside className="flex flex-col w-full md:w-72 md:h-screen md:flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-100 bg-white md:sticky md:top-0 z-50">
       
-      {/* 1. ENCABEZADO: Logo + Acciones Móvil */}
       <div className="flex h-16 items-center justify-between px-4 md:px-6 md:h-24 md:border-b md:border-gray-100 bg-white relative z-20">
         <Link href="/dashboard-ch" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <Image src="/images/logo.svg" alt="Logo Delphos" width={32} height={32} style={{ width: 'auto', height: '32px' }} />
@@ -124,10 +126,7 @@ export default function SidebarPrivado() {
           </span>
         </Link>
 
-        {/* ACCIONES PARA PANTALLAS PEQUEÑAS (MÓVIL) */}
         <div className="flex items-center gap-2 md:hidden">
-          
-          {/* BOTÓN PERFIL MÓVIL */}
           <div className="relative" ref={menuRefMobile}>
             <button
               type="button"
@@ -142,7 +141,6 @@ export default function SidebarPrivado() {
               </span>
             </button>
 
-            {/* DROPDOWN PERFIL MÓVIL (Mejorado) */}
             {perfilMobileAbierto && (
               <div className="absolute right-0 top-full mt-3 w-56 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl z-50">
                 <div className="border-b border-gray-100 px-5 py-4 bg-gray-50/50">
@@ -164,7 +162,6 @@ export default function SidebarPrivado() {
             )}
           </div>
 
-          {/* BOTÓN HAMBURGUESA MÓVIL */}
           <button
             type="button"
             className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
@@ -182,7 +179,6 @@ export default function SidebarPrivado() {
         </div>
       </div>
 
-      {/* 2. NAVEGACIÓN PRINCIPAL (Menú) */}
       <nav 
         aria-label="Navegación de Capital Humano" 
         className={`${navMobileAbierto ? 'block' : 'hidden'} md:block w-full md:flex-1 overflow-y-auto bg-white relative z-10 border-b md:border-b-0 border-gray-100`}
@@ -210,10 +206,7 @@ export default function SidebarPrivado() {
         </ul>
       </nav>
 
-      {/* 3. PERFIL (MODO DESKTOP - PARTE INFERIOR) */}
       <div className="hidden md:block relative border-t border-gray-100 p-4" ref={menuRefDesktop}>
-        
-        {/* Dropdown Animado que se abre hacia arriba */}
         <div 
           className={`absolute bottom-full left-4 mb-2 w-[calc(100%-2rem)] overflow-hidden rounded-xl border border-gray-100 bg-white shadow-xl transition-all duration-200 z-50 origin-bottom ${
             menuDesktopAbierto ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2 pointer-events-none'
@@ -232,7 +225,6 @@ export default function SidebarPrivado() {
           </div>
         </div>
 
-        {/* Botón de perfil interactivo para PC */}
         <button
           type="button"
           className={`flex w-full cursor-pointer items-center gap-3.5 rounded-xl p-3 transition-all duration-200 focus:outline-none ${
@@ -251,7 +243,6 @@ export default function SidebarPrivado() {
               {etiquetaRol(user.rol)}
             </span>
           </span>
-          {/* Flechita (Chevron) indicadora */}
           <svg 
             className={`ml-auto h-4 w-4 text-gray-400 transition-transform duration-300 ${menuDesktopAbierto ? 'rotate-180' : ''}`} 
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"

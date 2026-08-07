@@ -16,6 +16,7 @@ export default function FlashcardsPage() {
   
   const [isFlipped, setIsFlipped] = useState(false);
   const [respuestaEscrita, setRespuestaEscrita] = useState('');
+  const [historialRespuestas, setHistorialRespuestas] = useState<any[]>([]); // NUEVO: Acumula las respuestas
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const iniciarFlashcards = async () => {
@@ -37,6 +38,7 @@ export default function FlashcardsPage() {
       setIndiceActual(0);
       setIsFlipped(false);
       setRespuestaEscrita('');
+      setHistorialRespuestas([]);
       setFase('estudio');
     } catch (error: any) {
       setErrorMsg(error.message || 'Error al conectar con el servidor.');
@@ -50,8 +52,19 @@ export default function FlashcardsPage() {
     }
   };
 
-  // AQUÍ ESTÁ EL CAMBIO PARA GUARDAR EL RESULTADO (SIN PUNTUACIÓN)
   const handleSiguiente = async () => {
+    const tarjetaActual = tarjetas[indiceActual];
+    
+    // GUARDAMOS EL DETALLE LOCALMENTE
+    const nuevoDetalle = {
+      pregunta: tarjetaActual.pregunta,
+      respuesta_usuario: respuestaEscrita || 'Sin responder',
+      respuesta_correcta: tarjetaActual.respuesta_correcta,
+      es_correcta: true // Flashcards son de auto-repaso, las marcamos como correctas para evitar color rojo
+    };
+    const nuevoHistorial = [...historialRespuestas, nuevoDetalle];
+    setHistorialRespuestas(nuevoHistorial);
+
     if (indiceActual < tarjetas.length - 1) {
       setIsFlipped(false);
       setTimeout(() => {
@@ -59,17 +72,17 @@ export default function FlashcardsPage() {
         setRespuestaEscrita('');
       }, 300);
     } else {
-      // Guardar en BD antes de ir a fin
       const user = authService.getCurrentUser();
       if (user) {
         try {
+          // @ts-ignore
           await estudioService.guardarResultado({
             usuario_id: user.id,
             metodo: 'flashcard',
-            puntuacion: null, // No hay puntaje aquí
-            total_preguntas: tarjetas.length
+            puntuacion: null, 
+            total_preguntas: tarjetas.length,
+            respuestas_detalle: nuevoHistorial // LO ENVIAMOS AL BACKEND
           });
-          // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
           useProgresoStore.getState().cargar();
         } catch (err) {
           console.error("No se pudo guardar el registro en la bd", err);

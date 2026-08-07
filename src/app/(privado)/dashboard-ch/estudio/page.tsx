@@ -1,30 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { estudioService, type Pregunta } from '@/services/estudioService';
+import ModalTarjeta from '@/components/global/ModalTarjeta';
+import { estudioService, type Pregunta, type ResultadoEstudio } from '@/services/estudioService';
 import SessionExpired from '@/components/global/SessionExpired';
 import Paginador from '@/components/global/Paginador';
-import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
 type ModoEstudio = 'cuestionario' | 'flashcard' | 'verdadero_falso';
 type VistaEstudio = 'preguntas' | 'resultados';
-
-// ============================================================================
-// INTERFACES PARA RESULTADOS Y FORMULARIOS
-// ============================================================================
-export interface ResultadoEstudio {
-  id: string;
-  usuario: {
-    nombre: string;
-    email: string;
-    departamento: string;
-  };
-  metodo: ModoEstudio;
-  puntuacion?: number | null;
-  total_preguntas?: number | null;
-  fecha_completado: string;
-  respuestas_detalle?: any[]; 
-}
 
 interface UsuarioAgrupado {
   email: string;
@@ -54,9 +37,6 @@ const formatoFecha = new Intl.DateTimeFormat('es', {
   minute: '2-digit',
 });
 
-// ============================================================================
-// COMPONENTES AUXILIARES DE DISEÑO
-// ============================================================================
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
@@ -66,94 +46,104 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL
-// ============================================================================
 export default function EstudioPage() {
   const [vista, setVista] = useState<VistaEstudio>('preguntas');
 
-  // ESTADOS: PREGUNTAS
   const [modoActivo, setModoActivo] = useState<ModoEstudio>('cuestionario');
   const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [cargandoPreguntas, setCargandoPreguntas] = useState(true);
   const [errorPreguntas, setErrorPreguntas] = useState<string | null>(null);
 
-  // Estados para Modal de Crear/Editar
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [formulario, setFormulario] = useState(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
+  const [preguntaAEliminar, setPreguntaAEliminar] = useState<string | null>(null);
+  const [eliminandoPregunta, setEliminandoPregunta] = useState(false);
+  const [alertModal, setAlertModal] = useState<string | null>(null);
 
-  // ESTADOS: RESULTADOS AGRUPADOS
   const [resultadosAgrupados, setResultadosAgrupados] = useState<UsuarioAgrupado[]>([]);
   const [cargandoResultados, setCargandoResultados] = useState(false);
   const [errorResultados, setErrorResultados] = useState<string | null>(null);
   const [resultadosCargados, setResultadosCargados] = useState(false);
   
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<UsuarioAgrupado | null>(null);
+  const [intentoSeleccionado, setIntentoSeleccionado] = useState<ResultadoEstudio | null>(null);
   const [paginaResultados, setPaginaResultados] = useState(1);
-  const [departamentoFiltro, setDepartamentoFiltro] = useState('');
 
-  // EFECTOS Y CARGA DE DATOS
+  // Polling para Preguntas y Resultados dependiendo de la vista activa
   useEffect(() => {
-    cargarPreguntas();
-  }, []);
+    let cancelado = false;
+    let intId: NodeJS.Timeout;
 
-  const cargarPreguntas = () => {
-    setCargandoPreguntas(true);
-    setErrorPreguntas(null);
-    estudioService.listar()
-      .then(setPreguntas)
-      .catch((err: Error) => setErrorPreguntas(err.message))
-      .finally(() => setCargandoPreguntas(false));
-  };
-
-  const cargarResultados = async () => {
-    setCargandoResultados(true);
-    setErrorResultados(null);
-    try {
-      const data = await estudioService.obtenerResultados();
-      
-      const gruposMap = new Map<string, UsuarioAgrupado>();
-      data.forEach((r) => {
-        if (!r.usuario) return;
-        const email = r.usuario.email;
-        if (!gruposMap.has(email)) {
-          gruposMap.set(email, {
-            email: email,
-            nombre: r.usuario.nombre,
-            departamento: r.usuario.departamento,
-            intentos: []
-          });
+    if (vista === 'preguntas') {
+      const fetchPreguntas = async (fondo = false) => {
+        if (!fondo) setCargandoPreguntas(true);
+        try {
+          const data = await estudioService.listar();
+          if (!cancelado) {
+            setPreguntas(data);
+            setErrorPreguntas(null);
+          }
+        } catch (err: any) {
+          if (!cancelado && !fondo) setErrorPreguntas(err.message);
+        } finally {
+          if (!cancelado && !fondo) setCargandoPreguntas(false);
         }
-        gruposMap.get(email)!.intentos.push(r);
-      });
+      };
 
-      const gruposArray = Array.from(gruposMap.values());
-      setResultadosAgrupados(gruposArray);
-      setResultadosCargados(true);
-    } catch (err: any) {
-      setErrorResultados(err.message);
-    } finally {
-      setCargandoResultados(false);
+      fetchPreguntas(false);
+      intId = setInterval(() => fetchPreguntas(true), 10000);
+    } else {
+      const fetchResultados = async (fondo = false) => {
+        if (!fondo) setCargandoResultados(true);
+        try {
+          const data = await estudioService.obtenerResultados();
+          if (!cancelado) {
+            const gruposMap = new Map<string, UsuarioAgrupado>();
+            data.forEach((r) => {
+              if (!r.usuario) return;
+              const email = r.usuario.email;
+              if (!gruposMap.has(email)) {
+                gruposMap.set(email, {
+                  email: email,
+                  nombre: r.usuario.nombre,
+                  departamento: r.usuario.departamento,
+                  intentos: []
+                });
+              }
+              gruposMap.get(email)!.intentos.push(r);
+            });
+            setResultadosAgrupados(Array.from(gruposMap.values()));
+            setResultadosCargados(true);
+            setErrorResultados(null);
+          }
+        } catch (err: any) {
+          if (!cancelado && !fondo) setErrorResultados(err.message);
+        } finally {
+          if (!cancelado && !fondo) setCargandoResultados(false);
+        }
+      };
+
+      fetchResultados(!resultadosCargados ? false : true);
+      intId = setInterval(() => fetchResultados(true), 10000);
     }
-  };
+
+    return () => {
+      cancelado = true;
+      if (intId) clearInterval(intId);
+    };
+  }, [vista, resultadosCargados]);
 
   const cambiarVista = (v: VistaEstudio) => {
     setVista(v);
-    if (v === 'resultados' && !resultadosCargados && !cargandoResultados) {
-      cargarResultados();
-    }
   };
 
-  const cambiarDepartamentoFiltro = (valor: string) => {
-    setDepartamentoFiltro(valor);
-    setPaginaResultados(1);
+  const cerrarModalUsuario = () => {
+    setUsuarioSeleccionado(null);
+    setIntentoSeleccionado(null);
   };
 
-  // ============================================================================
-  // FUNCIONES DE ACCIÓN (PREGUNTAS)
-  // ============================================================================
   const abrirCrear = () => {
     setEditandoId(null);
     setFormulario({ ...FORM_VACIO, tipo: modoActivo });
@@ -175,13 +165,21 @@ export default function EstudioPage() {
     setModalAbierto(true);
   };
 
-  const handleEliminar = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar esta pregunta del sistema? (Se mantendrá oculta en el historial)')) return;
+  const handleEliminar = (id: string) => {
+    setPreguntaAEliminar(id);
+  };
+
+  const ejecutarEliminacion = async () => {
+    if (!preguntaAEliminar) return;
+    setEliminandoPregunta(true);
     try {
-      await estudioService.eliminar(id);
-      setPreguntas(prev => prev.filter(p => p.id !== id));
+      await estudioService.eliminar(preguntaAEliminar);
+      setPreguntas((prev) => prev.filter((p) => p.id !== preguntaAEliminar));
+      setPreguntaAEliminar(null);
     } catch (error) {
-      alert('Hubo un error al eliminar');
+      setAlertModal('Hubo un error al eliminar');
+    } finally {
+      setEliminandoPregunta(false);
     }
   };
 
@@ -200,21 +198,21 @@ export default function EstudioPage() {
 
       if (editandoId) {
         await estudioService.actualizar(editandoId, datosAEnviar);
-        setPreguntas(prev => prev.map(p => p.id === editandoId ? { ...p, ...datosAEnviar } as Pregunta : p));
       } else {
         // @ts-ignore
         await estudioService.crear(datosAEnviar);
-        cargarPreguntas(); 
       }
       setModalAbierto(false);
+      // Forzar carga inmediatamente
+      const data = await estudioService.listar();
+      setPreguntas(data);
     } catch (error) {
-      alert('Error al guardar la pregunta');
+      setAlertModal('Error al guardar la pregunta');
     } finally {
       setGuardando(false);
     }
   };
 
-  // ORDEN LÓGICO INTELIGENTE
   const preguntasFiltradas = useMemo(() => {
     const filtradas = preguntas.filter(p => p.tipo === modoActivo);
     
@@ -238,28 +236,16 @@ export default function EstudioPage() {
   };
 
   const ordenarIntentos = (intentos: ResultadoEstudio[]) => {
-    const orden = { 'cuestionario': 1, 'flashcard': 2, 'verdadero_falso': 3 };
     return [...intentos].sort((a, b) => {
-      if (orden[a.metodo] !== orden[b.metodo]) {
-        return orden[a.metodo] - orden[b.metodo];
-      }
       return new Date(b.fecha_completado).getTime() - new Date(a.fecha_completado).getTime();
     });
   };
 
-  const resultadosFiltrados = useMemo(() => {
-    if (!departamentoFiltro) return resultadosAgrupados;
-    return resultadosAgrupados.filter((u) => u.departamento === departamentoFiltro);
-  }, [resultadosAgrupados, departamentoFiltro]);
-
   const resultadosPaginados = useMemo(() => {
     const inicio = (paginaResultados - 1) * RESULTADOS_POR_PAGINA;
-    return resultadosFiltrados.slice(inicio, inicio + RESULTADOS_POR_PAGINA);
-  }, [resultadosFiltrados, paginaResultados]);
+    return resultadosAgrupados.slice(inicio, inicio + RESULTADOS_POR_PAGINA);
+  }, [resultadosAgrupados, paginaResultados]);
 
-  // ============================================================================
-  // VALIDACIÓN DE SESIÓN ROBUSTA (Atrapa cualquier error de Auth)
-  // ============================================================================
   const tokenInvalido = (err: string | null) => {
     if (!err) return false;
     const lower = err.toLowerCase();
@@ -276,13 +262,9 @@ export default function EstudioPage() {
   const esErrorSesionPreguntas = tokenInvalido(errorPreguntas);
   const esErrorSesionResultados = tokenInvalido(errorResultados);
 
-  // ============================================================================
-  // RENDERIZADO
-  // ============================================================================
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
       
-      {/* HEADER ELEGANTE */}
       <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
@@ -298,7 +280,6 @@ export default function EstudioPage() {
           </p>
         </div>
         
-        {/* NAVEGACIÓN PRINCIPAL (Toggle) */}
         <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
           <button
             onClick={() => cambiarVista('preguntas')}
@@ -323,9 +304,6 @@ export default function EstudioPage() {
         </div>
       </header>
 
-      {/* ============================================================================
-          VISTA: PREGUNTAS
-          ============================================================================ */}
       {vista === 'preguntas' && (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           
@@ -342,7 +320,6 @@ export default function EstudioPage() {
             </button>
           </div>
 
-          {/* PESTAÑAS TIPO PÍLDORA (MÉTODOS) */}
           <div className="flex flex-wrap gap-2.5 pb-6">
             {['cuestionario', 'flashcard', 'verdadero_falso'].map((modo) => (
               <button
@@ -359,7 +336,6 @@ export default function EstudioPage() {
             ))}
           </div>
 
-          {/* TABLA DE PREGUNTAS */}
           {cargandoPreguntas ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -375,7 +351,7 @@ export default function EstudioPage() {
                 </div>
                 <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
                 <p className="max-w-sm text-sm text-gray-500">{errorPreguntas}</p>
-                <button onClick={cargarPreguntas} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+                <button onClick={() => setCargandoPreguntas(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
               </div>
             )
           ) : preguntasFiltradas.length === 0 ? (
@@ -391,7 +367,6 @@ export default function EstudioPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {/* El Nivel solo se muestra si el modo es cuestionario */}
                     {modoActivo === 'cuestionario' && (
                       <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nivel</th>
                     )}
@@ -425,27 +400,10 @@ export default function EstudioPage() {
         </section>
       )}
 
-      {/* ============================================================================
-          VISTA: RESULTADOS
-          ============================================================================ */}
       {vista === 'resultados' && (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <Eyebrow>Registro de Evaluaciones</Eyebrow>
-
-          {/* BARRA DE FILTROS */}
-          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-            <SelectorDepartamento value={departamentoFiltro} onChange={cambiarDepartamentoFiltro} />
-            {departamentoFiltro && (
-              <button
-                type="button"
-                onClick={() => cambiarDepartamentoFiltro('')}
-                className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
-              >
-                Limpiar filtros
-              </button>
-            )}
-          </div>
-
+          
           {cargandoResultados ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -461,22 +419,16 @@ export default function EstudioPage() {
                 </div>
                 <p className="text-base font-bold text-gray-900">Error al cargar resultados</p>
                 <p className="max-w-sm text-sm text-gray-500">{errorResultados}</p>
-                <button onClick={cargarResultados} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+                <button onClick={() => setCargandoResultados(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
               </div>
             )
-          ) : resultadosFiltrados.length === 0 ? (
+          ) : resultadosAgrupados.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
               <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
               </div>
-              <p className="text-lg font-bold text-gray-900">
-                {departamentoFiltro ? 'Sin coincidencias' : 'Sin evaluaciones'}
-              </p>
-              <p className="text-sm text-gray-500">
-                {departamentoFiltro
-                  ? 'Ningún usuario de este departamento completó un método de estudio.'
-                  : 'Cuando un usuario complete un método de estudio, aparecerá aquí.'}
-              </p>
+              <p className="text-lg font-bold text-gray-900">Sin evaluaciones</p>
+              <p className="text-sm text-gray-500">Cuando un usuario complete un método de estudio, aparecerá aquí.</p>
             </div>
           ) : (
             <div className="overflow-x-auto mt-4">
@@ -521,16 +473,15 @@ export default function EstudioPage() {
                 </tbody>
               </table>
               
-              {/* PAGINACIÓN */}
               <div className="mt-4 pt-5 border-t border-gray-100 w-full">
-                <Paginador
+                <Paginador 
                   paginacion={{
                     pagina: paginaResultados,
                     limite: RESULTADOS_POR_PAGINA,
-                    total: resultadosFiltrados.length,
-                    totalPaginas: Math.ceil(resultadosFiltrados.length / RESULTADOS_POR_PAGINA)
-                  }}
-                  onCambiarPagina={setPaginaResultados}
+                    total: resultadosAgrupados.length,
+                    totalPaginas: Math.ceil(resultadosAgrupados.length / RESULTADOS_POR_PAGINA)
+                  }} 
+                  onCambiarPagina={setPaginaResultados} 
                 />
               </div>
             </div>
@@ -538,9 +489,6 @@ export default function EstudioPage() {
         </section>
       )}
 
-      {/* ============================================================================
-          MODAL: CREACIÓN / EDICIÓN DE PREGUNTA
-          ============================================================================ */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl overflow-hidden">
@@ -549,7 +497,6 @@ export default function EstudioPage() {
             </h2>
             
             <form onSubmit={handleGuardar} className="flex flex-col gap-5">
-              
               <div className={`grid grid-cols-1 ${formulario.tipo === 'cuestionario' ? 'sm:grid-cols-2' : ''} gap-5`}>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Método de Estudio</label>
@@ -557,7 +504,7 @@ export default function EstudioPage() {
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm disabled:opacity-60"
                     value={formulario.tipo}
                     onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value as ModoEstudio })}
-                    disabled={!!editandoId} // No puedes cambiar el método de una pregunta existente
+                    disabled={!!editandoId}
                   >
                     <option value="cuestionario">Cuestionario (Opciones A,B,C,D)</option>
                     <option value="flashcard">Flashcards</option>
@@ -565,7 +512,6 @@ export default function EstudioPage() {
                   </select>
                 </div>
                 
-                {/* Nivel de módulo solo visible para cuestionarios */}
                 {formulario.tipo === 'cuestionario' && (
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Nivel o Módulo</label>
@@ -593,7 +539,6 @@ export default function EstudioPage() {
                 />
               </div>
 
-              {/* Opciones A, B, C, D solo para Cuestionario */}
               {formulario.tipo === 'cuestionario' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
                   {(['a', 'b', 'c', 'd'] as const).map(letra => (
@@ -662,9 +607,28 @@ export default function EstudioPage() {
         </div>
       )}
 
-      {/* ============================================================================
-          MODAL: DETALLES DE RESULTADO AGRUPADO
-          ============================================================================ */}
+      <ModalTarjeta
+        isOpen={!!preguntaAEliminar}
+        onClose={() => setPreguntaAEliminar(null)}
+        onConfirm={ejecutarEliminacion}
+        titulo="¿Eliminar pregunta?"
+        descripcion="¿Estás seguro de que deseas eliminar esta pregunta del sistema? Se mantendrá oculta en el historial."
+        textoConfirmar="Eliminar"
+        textoCancelar="Cancelar"
+        cargando={eliminandoPregunta}
+        esDestructivo={true}
+      />
+
+      <ModalTarjeta
+        isOpen={!!alertModal}
+        onClose={() => setAlertModal(null)}
+        onConfirm={() => setAlertModal(null)}
+        titulo="Error"
+        descripcion={alertModal ?? ''}
+        textoConfirmar="Aceptar"
+        textoCancelar="Cerrar"
+      />
+
       {usuarioSeleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -675,7 +639,7 @@ export default function EstudioPage() {
                 <p className="text-sm font-medium text-gray-500">{usuarioSeleccionado.departamento} · {usuarioSeleccionado.email}</p>
               </div>
               <button
-                onClick={() => setUsuarioSeleccionado(null)}
+                onClick={cerrarModalUsuario}
                 className="rounded-full p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors"
                 aria-label="Cerrar"
               >
@@ -686,49 +650,110 @@ export default function EstudioPage() {
             </div>
 
             <div className="deinsa-scroll overflow-y-auto p-8 bg-[#f8f9fa]">
-              <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
-                <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
-                Historial de Sesiones
-              </div>
               
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/50">
-                      <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Método Evaluado</th>
-                      <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Puntuación Final</th>
-                      <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Fecha y Hora</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {ordenarIntentos(usuarioSeleccionado.intentos).map((intento) => (
-                      <tr key={intento.id} className="transition-colors hover:bg-gray-50/50">
-                        <td className="px-6 py-5">
-                          <span className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-bold border shadow-sm
-                            ${intento.metodo === 'cuestionario' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
-                            ${intento.metodo === 'flashcard' ? 'bg-purple-50 text-purple-700 border-purple-200' : ''}
-                            ${intento.metodo === 'verdadero_falso' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}
-                          `}>
-                            {formatoMetodo(intento.metodo)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5">
-                          {intento.puntuacion !== undefined && intento.puntuacion !== null ? (
-                            <span className="font-black text-gray-900 text-base">
-                              {intento.puntuacion} <span className="text-sm font-bold text-gray-400">/ {intento.total_preguntas}</span>
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 font-medium italic">Repaso libre</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-5 text-right whitespace-nowrap font-medium text-gray-500">
-                          {formatoFecha.format(new Date(intento.fecha_completado))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {intentoSeleccionado ? (
+                <div>
+                  <button 
+                    onClick={() => setIntentoSeleccionado(null)} 
+                    className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 mb-6 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Volver al historial
+                  </button>
+                  
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">
+                      <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+                      Respuestas de {formatoMetodo(intentoSeleccionado.metodo)}
+                    </div>
+                    {intentoSeleccionado.puntuacion !== undefined && intentoSeleccionado.puntuacion !== null && (
+                       <span className="inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-sm font-bold text-white shadow-sm">
+                         Nota: {intentoSeleccionado.puntuacion} / {intentoSeleccionado.total_preguntas}
+                       </span>
+                    )}
+                  </div>
+
+                  {!intentoSeleccionado.respuestas_detalle || intentoSeleccionado.respuestas_detalle.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
+                      <p className="text-sm font-medium text-gray-500">No hay detalles de las respuestas guardados para este intento histórico.</p>
+                      <p className="text-xs text-gray-400 mt-1">(Los nuevos intentos registrarán cada pregunta)</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                      {intentoSeleccionado.respuestas_detalle.map((resp, idx) => (
+                        <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                          <p className="text-base font-bold text-gray-900 mb-4">{idx + 1}. {resp.pregunta}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="rounded-xl bg-gray-50 p-4 border border-gray-100">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Respuesta del Usuario</p>
+                              <p className={`text-sm font-bold ${resp.es_correcta ? 'text-green-600' : 'text-red-500'}`}>
+                                {resp.respuesta_usuario || 'Sin responder'}
+                              </p>
+                            </div>
+                            <div className="rounded-xl bg-green-50 p-4 border border-green-100">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 mb-1">Respuesta Correcta</p>
+                              <p className="text-sm font-bold text-green-700">{resp.respuesta_correcta}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
+                    <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+                    Historial de Sesiones
+                  </div>
+                  
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50/50">
+                          <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Método Evaluado</th>
+                          <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Puntuación Final</th>
+                          <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Fecha y Hora</th>
+                          <th className="pb-4 pt-4 px-6 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Detalle</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {ordenarIntentos(usuarioSeleccionado.intentos).map((intento) => (
+                          <tr key={intento.id} className="transition-colors hover:bg-gray-50/50">
+                            <td className="px-6 py-5">
+                              <span className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-bold border shadow-sm border-brand-orange/20 bg-brand-orange/10 text-brand-orange`}>
+                                {formatoMetodo(intento.metodo)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-5">
+                              {intento.puntuacion !== undefined && intento.puntuacion !== null ? (
+                                <span className="font-black text-gray-900 text-base">
+                                  {intento.puntuacion} <span className="text-sm font-bold text-gray-400">/ {intento.total_preguntas}</span>
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 font-medium italic">Repaso libre</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-5 whitespace-nowrap font-medium text-gray-500">
+                              {formatoFecha.format(new Date(intento.fecha_completado))}
+                            </td>
+                            <td className="px-6 py-5 text-right whitespace-nowrap">
+                              <button 
+                                onClick={() => setIntentoSeleccionado(intento)}
+                                className="text-sm font-bold text-brand-orange hover:text-orange-700 transition-colors"
+                              >
+                                Ver respuestas
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
             
           </div>

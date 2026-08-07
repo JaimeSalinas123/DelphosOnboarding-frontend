@@ -16,10 +16,6 @@ import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
 const USUARIOS_POR_PAGINA = 10;
 
-// ============================================================================
-// COMPONENTES AUXILIARES Y DE DISEÑO
-// ============================================================================
-
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
@@ -29,7 +25,6 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Roles que el toggle de la tabla entiende */
 function esRolEditable(rol: string): rol is RolEditable {
   return rol === 'nuevo_integrante' || rol === 'administrador';
 }
@@ -181,10 +176,6 @@ function ModalDetalleProgreso({
   );
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL
-// ============================================================================
-
 export default function UsuariosPage() {
   const { user: usuarioActual } = useAuth();
   const [usuarios, setUsuarios] = useState<UsuarioListado[]>([]);
@@ -200,32 +191,32 @@ export default function UsuariosPage() {
   const [pagina, setPagina] = useState(1);
   const [paginacion, setPaginacion] = useState<Paginacion | null>(null);
 
-  // Progreso por usuario (Ecosistema/Estudio/Encuesta), cruzado por usuario_id.
-  // Se carga completo una sola vez porque pagina distinto a la tabla de usuarios.
   const [progresoPorUsuario, setProgresoPorUsuario] = useState<Map<string, ProgresoPasante>>(
     new Map()
   );
   const [cargandoProgreso, setCargandoProgreso] = useState(true);
   const [detalleProgreso, setDetalleProgreso] = useState<ProgresoPasante | null>(null);
 
+  // Polling para el progreso
   useEffect(() => {
     let cancelado = false;
-    progresoService
-      .listarTodoAdmin()
-      .then((data) => {
-        if (cancelado) return;
-        setProgresoPorUsuario(new Map(data.map((p) => [p.usuario_id, p])));
-      })
-      .catch(() => {
-        // El progreso es un dato complementario: si falla, la tabla de
-        // usuarios sigue funcionando, solo se ve "—" en esa columna.
-      })
-      .finally(() => {
-        if (!cancelado) setCargandoProgreso(false);
-      });
-    return () => {
-      cancelado = true;
+    const fetchProgreso = async (fondo = false) => {
+      if (!fondo) setCargandoProgreso(true);
+      try {
+        const data = await progresoService.listarTodoAdmin();
+        if (!cancelado) {
+          setProgresoPorUsuario(new Map(data.map((p) => [p.usuario_id, p])));
+        }
+      } catch (e) {
+        // Fallo silencioso si es background
+      } finally {
+        if (!cancelado && !fondo) setCargandoProgreso(false);
+      }
     };
+
+    fetchProgreso(false);
+    const intId = setInterval(() => fetchProgreso(true), 10000);
+    return () => { cancelado = true; clearInterval(intId); };
   }, []);
 
   const puedeEditarRoles = usuarioActual?.rol === 'administrador';
@@ -235,7 +226,6 @@ export default function UsuariosPage() {
     !!usuarioActual &&
     usuarioActual.email.toLowerCase() === usuario.email.toLowerCase();
 
-  // Espera a que el usuario deje de tipear antes de pegar al backend.
   useEffect(() => {
     const id = setTimeout(() => {
       setBusquedaDebounced(busqueda.trim());
@@ -244,33 +234,33 @@ export default function UsuariosPage() {
     return () => clearTimeout(id);
   }, [busqueda]);
 
-  // Recarga cuando cambia el filtro, página o tras reintentar.
+  // Polling para los usuarios
   useEffect(() => {
     let cancelado = false;
-    setCargando(true);
-    setError(null);
-    usuarioService
-      .listar({
-        nombre: busquedaDebounced || undefined,
-        departamento: departamentoFiltro || undefined,
-        pagina,
-        limite: USUARIOS_POR_PAGINA,
-      })
-      .then((data) => {
+    const fetchUsuarios = async (fondo = false) => {
+      if (!fondo) setCargando(true);
+      try {
+        const data = await usuarioService.listar({
+          nombre: busquedaDebounced || undefined,
+          departamento: departamentoFiltro || undefined,
+          pagina,
+          limite: USUARIOS_POR_PAGINA,
+        });
         if (!cancelado) {
           setUsuarios(data.usuarios);
           setPaginacion(data.paginacion);
+          setError(null);
         }
-      })
-      .catch((err: Error) => {
-        if (!cancelado) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelado) setCargando(false);
-      });
-    return () => {
-      cancelado = true;
+      } catch (err: any) {
+        if (!cancelado && !fondo) setError(err.message);
+      } finally {
+        if (!cancelado && !fondo) setCargando(false);
+      }
     };
+
+    fetchUsuarios(false);
+    const intId = setInterval(() => fetchUsuarios(true), 10000);
+    return () => { cancelado = true; clearInterval(intId); };
   }, [busquedaDebounced, departamentoFiltro, pagina, intentos]);
 
   const cambiarDepartamentoFiltro = (valor: string) => {
@@ -291,7 +281,6 @@ export default function UsuariosPage() {
     setActualizandoId(usuario.id);
     setErrorFila(null);
     
-    // Optimista
     setUsuarios((prev) =>
       prev.map((u) => (u.id === usuario.id ? { ...u, rol: nuevoRol } : u))
     );
@@ -311,24 +300,16 @@ export default function UsuariosPage() {
     }
   };
 
-  // Administradores primero; dentro de cada grupo, orden alfabético por nombre.
   const usuariosOrdenados = [...usuarios].sort((a, b) => {
     const prioridad = (u: UsuarioListado) => (u.rol === 'administrador' ? 0 : 1);
     const diff = prioridad(a) - prioridad(b);
     return diff !== 0 ? diff : a.nombre.localeCompare(b.nombre, 'es');
   });
 
-  // Verificación de expiración de sesión
   const esErrorSesion = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
-
-  // ============================================================================
-  // RENDERIZADO
-  // ============================================================================
 
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
-      
-      {/* HEADER ELEGANTE */}
       <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
@@ -350,11 +331,9 @@ export default function UsuariosPage() {
         )}
       </header>
 
-      {/* CONTENEDOR PRINCIPAL TIPO TARJETA */}
       <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
         <Eyebrow>Directorio</Eyebrow>
 
-        {/* BARRA DE FILTROS */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="relative flex-1 max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
@@ -384,7 +363,6 @@ export default function UsuariosPage() {
           )}
         </div>
 
-        {/* ALERTA DE ERROR AL ACTUALIZAR FILA */}
         {errorFila && (
           <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-medium text-red-600 flex items-center gap-3">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -394,7 +372,6 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        {/* CONTENIDO (Tabla, Spinners o Errores) */}
         {cargando ? (
           <div className="flex flex-col items-center justify-center gap-4 py-24">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -491,7 +468,6 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        {/* PAGINACIÓN E IMPORTACIÓN */}
         {!cargando && !error && paginacion && (
           <div className="mt-6 pt-6 border-t border-gray-100 flex justify-end">
             <Paginador paginacion={paginacion} onCambiarPagina={setPagina} />

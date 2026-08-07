@@ -15,15 +15,14 @@ export interface Pregunta {
   activo?: boolean;
 }
 
-// NUEVO: Lo que le enviaremos al backend cuando acabe de estudiar
 export interface ResultadoEnvio {
   usuario_id: string;
   metodo: 'cuestionario' | 'flashcard' | 'verdadero_falso';
   puntuacion?: number | null;
   total_preguntas?: number | null;
+  respuestas_detalle?: any[];
 }
 
-// NUEVO: Lo que recibiremos del backend para pintar la tabla del Admin
 export interface ResultadoEstudio {
   id: string;
   usuario: {
@@ -35,49 +34,104 @@ export interface ResultadoEstudio {
   puntuacion?: number | null;
   total_preguntas?: number | null;
   fecha_completado: string;
+  respuestas_detalle?: any[];
 }
+
+// ==========================================
+// SEGURIDAD Y MANEJO DE ERRORES CORREGIDO
+// ==========================================
+
+const getAuthHeaders = (): HeadersInit => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  
+  if (typeof window !== 'undefined') {
+    // Buscamos el token como lo haces en el ChatbotFlotante
+    let token = localStorage.getItem('token');
+    
+    if (!token) {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('token'))) {
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key) || '');
+            if (parsed.access_token) token = parsed.access_token;
+          } catch (e) {
+            // Ignorar si no es JSON
+          }
+        }
+      }
+    }
+    
+    // Solo si encontramos un token, lo enviamos. 
+    // Si no hay, dejamos que el backend nos rechace con 401.
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  
+  return headers;
+};
+
+// Traduce los códigos de error del backend
+const handleResponse = async (response: Response, defaultErrorMessage: string) => {
+  if (!response.ok) {
+    // Si el backend nos rechaza (Token vencido, inválido o ausente)
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Token expirado'); // Esto dispara el componente de SessionExpired
+    }
+    
+    // Cualquier otro tipo de error
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || defaultErrorMessage);
+  }
+  
+  if (response.status === 204) return null;
+  
+  return response.json();
+};
+
+// ==========================================
+// SERVICIO PRINCIPAL
+// ==========================================
 
 export const estudioService = {
   listar: async (): Promise<Pregunta[]> => {
-    const response = await fetch(`${API_URL}/estudio/preguntas`);
-    if (!response.ok) throw new Error('Error al cargar las preguntas');
-    return response.json();
+    const response = await fetch(`${API_URL}/estudio/preguntas`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response, 'Error al cargar las preguntas');
   },
 
   actualizar: async (id: string, datos: Partial<Pregunta>): Promise<Pregunta> => {
     const response = await fetch(`${API_URL}/estudio/preguntas/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(datos)
     });
-    if (!response.ok) throw new Error('Error al actualizar la pregunta');
-    return response.json();
+    return handleResponse(response, 'Error al actualizar la pregunta');
   },
 
   eliminar: async (id: string): Promise<void> => {
     const response = await fetch(`${API_URL}/estudio/preguntas/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Error al eliminar la pregunta');
+    await handleResponse(response, 'Error al eliminar la pregunta');
   },
 
-  // NUEVAS FUNCIONES PARA LOS RESULTADOS
-guardarResultado: async (datos: ResultadoEnvio): Promise<void> => {
+  guardarResultado: async (datos: ResultadoEnvio): Promise<void> => {
     const response = await fetch(`${API_URL}/estudio/resultados`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(datos)
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Detalle del error del backend:", errorData);
-      throw new Error('Error al guardar el resultado');
-    }
+    await handleResponse(response, 'Error al guardar el resultado');
   },
 
   obtenerResultados: async (): Promise<ResultadoEstudio[]> => {
-    const response = await fetch(`${API_URL}/estudio/resultados`);
-    if (!response.ok) throw new Error('Error al cargar los resultados');
-    return response.json();
+    const response = await fetch(`${API_URL}/estudio/resultados`, {
+      headers: getAuthHeaders()
+    });
+    return handleResponse(response, 'Error al cargar los resultados');
   }
 };

@@ -83,9 +83,6 @@ export default function CuestionarioPage() {
       const user = authService.getCurrentUser();
       
       if (user) {
-        console.log("📝 DATOS DEL USUARIO (Depuración):", user);
-        
-        // 1. Buscamos el ID en TODAS las propiedades posibles (incluyendo anidadas)
         let rawUserId = 
           user.id || 
           user.usuario_id || 
@@ -97,29 +94,39 @@ export default function CuestionarioPage() {
           user.user?.id ||
           user.data?.user?.id;
         
-console.log("📝 DATOS EXACTOS DEL USUARIO:", JSON.stringify(user, null, 2));
-        // 2. Si encontramos un ID, lo convertimos a STRING (para que Zod no se queje)
         if (rawUserId !== undefined && rawUserId !== null) {
           const userIdString = String(rawUserId);
           
+          // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
+          const respuestas_detalle = preguntas.map(p => {
+            const seleccion = respuestasUsuario[p.id];
+            const esCorrecta = seleccion ? (
+              p.respuesta_correcta.trim().toLowerCase() === seleccion.key.toLowerCase() ||
+              p.respuesta_correcta.trim().toLowerCase() === seleccion.val.toLowerCase()
+            ) : false;
+
+            return {
+              pregunta: p.pregunta,
+              respuesta_usuario: seleccion ? `${seleccion.key}) ${seleccion.val}` : 'Sin responder',
+              respuesta_correcta: p.respuesta_correcta,
+              es_correcta: esCorrecta
+            };
+          });
+          
           try {
+            // @ts-ignore
             await estudioService.guardarResultado({
               usuario_id: userIdString,
               metodo: 'cuestionario',
               puntuacion: calcularPuntuacion(),
-              total_preguntas: preguntas.length
+              total_preguntas: preguntas.length,
+              respuestas_detalle // LO ENVIAMOS AL BACKEND
             });
-            console.log("✅ Resultado guardado exitosamente en BD para ID:", userIdString);
-            // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
             useProgresoStore.getState().cargar();
           } catch (err) {
             console.error("❌ Error al guardar el resultado en la BD:", err);
           }
-        } else {
-          console.error("❌ No se encontró ningún ID en el objeto de usuario. Asegúrate de iniciar sesión de nuevo.");
         }
-      } else {
-        console.error("❌ El objeto usuario es null (No hay sesión activa).");
       }
       setFase('resultados');
     }
