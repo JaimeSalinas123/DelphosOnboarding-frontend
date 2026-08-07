@@ -58,10 +58,21 @@ const ENLACES = [
     label: 'Documentación',
     icono: (
       <svg {...ICON_PROPS}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3 13.2 8.8 19 10l-5.8 1.2L12 17l-1.2-5.8L5 10l5.8-1.2L12 3Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="m18.4 15.5 1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1 1-2.9Z" />
       </svg>
     ),
   },
+  {
+    href: '/dashboard-ch/nuevoconocimiento',
+    label: 'Aprendizaje IA',
+    icono: (
+      <svg {...ICON_PROPS}>
+        {/* Ícono de foco/idea para nuevos conocimientos */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.829 1.58-2.083a4.501 4.501 0 10-7.66 0c.922.254 1.58 1.1 1.58 2.083v.192" />
+      </svg>
+    ),
+  }
 ];
 
 function estaActivo(pathname: string | null, href: string) {

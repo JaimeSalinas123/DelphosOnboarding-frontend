@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { documentacionService } from '@/services/documentacionService';
 import SessionExpired from '@/components/global/SessionExpired';
 import ModalTarjeta from '@/components/global/ModalTarjeta';
@@ -14,6 +14,29 @@ interface ModuloIA {
 // Separadores exactos que usa tu TXT
 const SEPARADOR_LINEA = '===============================================================================';
 const PREFIJO_TITULO = '## ';
+
+// Texto de ejemplo genérico para descargar
+const TEXTO_EJEMPLO = `===============================================================================
+## 1. NOMBRE DEL MÓDULO DE EJEMPLO
+===============================================================================
+
+Aquí puedes escribir la información general o el propósito de este módulo. 
+La IA leerá este texto exactamente como lo estructures.
+
+Puedes usar listas para ser más claro:
+- Característica de ejemplo A.
+- Característica de ejemplo B.
+- Característica de ejemplo C.
+
+Recuerda que no debes borrar las líneas de "===" ni los "##" del título, ya que el sistema los usa para saber dónde empieza y termina cada tema.
+
+===============================================================================
+## 2. OTRO MÓDULO DE EJEMPLO
+===============================================================================
+
+Este es otro ejemplo de cómo se separa un módulo del anterior. 
+Simplemente copias la línea de iguales, pones "## " seguido de tu nuevo título, cierras con otra línea de iguales y comienzas a escribir tu nuevo contenido.
+`;
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -34,15 +57,19 @@ export default function DocumentacionPage() {
   
   const [busqueda, setBusqueda] = useState('');
   
-  // Modal de edición/creación
+  // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [formulario, setFormulario] = useState({ titulo: '', contenido: '' });
   const [alertModal, setAlertModal] = useState<string | null>(null);
 
-  // Modal de eliminación
   const [moduloAEliminar, setModuloAEliminar] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState(false);
+
+  // Subida de archivos
+  const [modalSubidaAbierto, setModalSubidaAbierto] = useState(false);
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. CARGAR Y PARSEAR EL ARCHIVO TXT
   const cargarDocumentacion = async () => {
@@ -78,7 +105,7 @@ export default function DocumentacionPage() {
 
     while ((match = regexSeccion.exec(textoBruto)) !== null) {
       nuevosModulos.push({
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 9),
         titulo: match[1].trim(),
         contenido: match[2].trim(),
       });
@@ -110,7 +137,7 @@ export default function DocumentacionPage() {
     }
   };
 
-  // 3. ACCIONES DE LA INTERFAZ
+  // 3. ACCIONES DE LA INTERFAZ (Crear, Editar, Eliminar)
   const abrirCrear = () => {
     setEditandoId(null);
     setFormulario({ 
@@ -152,7 +179,7 @@ export default function DocumentacionPage() {
       const actualizados = modulos.map(m => m.id === editandoId ? { ...m, ...formulario } : m);
       exito = await guardarEnBackend(actualizados);
     } else {
-      const nuevoModulo = { id: Math.random().toString(36).substr(2, 9), ...formulario };
+      const nuevoModulo = { id: Math.random().toString(36).substring(2, 9), ...formulario };
       const actualizados = [...modulos, nuevoModulo]; // Se agrega al final
       exito = await guardarEnBackend(actualizados);
     }
@@ -160,6 +187,60 @@ export default function DocumentacionPage() {
     setGuardando(false);
     if (exito) {
       setModalAbierto(false);
+    }
+  };
+
+  // 4. DESCARGAR Y SUBIR ARCHIVOS (NUEVAS FUNCIONES)
+  const descargarEjemplo = () => {
+    const blob = new Blob([TEXTO_EJEMPLO], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ejemplo_entrenamiento_ia.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const procesarArchivoSubido = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSubiendoArchivo(true);
+    try {
+      const textoImportado = await file.text();
+      
+      // Mismo regex para parsear el archivo importado
+      const regexSeccion = /===============================================================================\n##\s(.*?)\n===============================================================================\n([\s\S]*?)(?=\n={79}|$)/g;
+      
+      let match;
+      const nuevosModulosArchivo: ModuloIA[] = [];
+      
+      while ((match = regexSeccion.exec(textoImportado)) !== null) {
+        nuevosModulosArchivo.push({
+          id: Math.random().toString(36).substring(2, 9),
+          titulo: match[1].trim(),
+          contenido: match[2].trim(),
+        });
+      }
+
+      if (nuevosModulosArchivo.length === 0) {
+        setAlertModal('No se detectó ningún módulo en el archivo. Asegúrate de usar exactamente los separadores (====) y el título (## ).');
+      } else {
+        // Agregamos los módulos nuevos al final de la lista actual
+        const actualizados = [...modulos, ...nuevosModulosArchivo];
+        const exito = await guardarEnBackend(actualizados);
+        if (exito) {
+          setAlertModal(`¡Éxito! Se agregaron ${nuevosModulosArchivo.length} módulos nuevos a la base de conocimiento.`);
+        }
+      }
+    } catch (err: any) {
+      setAlertModal(`Hubo un error al leer el archivo: ${err.message}`);
+    } finally {
+      setSubiendoArchivo(false);
+      setModalSubidaAbierto(false);
+      if (fileInputRef.current) fileInputRef.current.value = ''; // Limpiamos el input
     }
   };
 
@@ -189,17 +270,54 @@ export default function DocumentacionPage() {
       </header>
 
       <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        
+        {/* BOTONES SUPERIORES */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-8">
           <Eyebrow>Módulos de Entrenamiento</Eyebrow>
-          <button 
-            onClick={abrirCrear}
-            className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
-          >
-            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-            Agregar Módulo
-          </button>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Botón: Descargar Ejemplo */}
+            <button 
+              onClick={descargarEjemplo}
+              className="inline-flex items-center justify-center rounded-xl bg-white border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-brand-orange"
+            >
+              <svg className="mr-2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Descargar Ejemplo
+            </button>
+
+            {/* Input File Oculto */}
+            <input 
+              type="file" 
+              accept=".txt" 
+              ref={fileInputRef} 
+              className="hidden" 
+              onChange={procesarArchivoSubido}
+            />
+
+            {/* Botón: Subir TXT */}
+            <button 
+              onClick={() => setModalSubidaAbierto(true)}
+              className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-gray-800 hover:shadow-lg"
+            >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Subir TXT
+            </button>
+
+            {/* Botón: Manual */}
+            <button 
+              onClick={abrirCrear}
+              className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
+            >
+              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Agregar Pregunta
+            </button>
+          </div>
         </div>
 
         <div className="mb-8 relative max-w-md">
@@ -295,12 +413,10 @@ export default function DocumentacionPage() {
         )}
       </section>
 
-      {/* MODAL DE EDICIÓN / CREACIÓN REDISEÑADO */}
+      {/* MODAL DE EDICIÓN / CREACIÓN MANUAL */}
       {modalAbierto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl flex flex-col max-h-[90vh]">
-            
-            {/* Cabecera del Modal */}
             <div className="flex items-start justify-between border-b border-gray-100 bg-white p-6 sm:p-8 relative z-10">
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-orange/10 to-brand-orange/5 text-brand-orange shadow-inner">
@@ -326,10 +442,8 @@ export default function DocumentacionPage() {
               </button>
             </div>
             
-            {/* Cuerpo del Formulario */}
             <div className="p-6 sm:p-8 overflow-y-auto deinsa-scroll flex-1 bg-gray-50/50">
               <form id="form-doc" onSubmit={handleSubmit} className="flex flex-col gap-6 h-full">
-                
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Título del Módulo</label>
                   <input
@@ -358,7 +472,6 @@ export default function DocumentacionPage() {
               </form>
             </div>
             
-            {/* Footer de Botones */}
             <div className="p-6 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-3 bg-white relative z-10">
               <button 
                 type="button" 
@@ -389,7 +502,20 @@ export default function DocumentacionPage() {
         </div>
       )}
 
-      {/* COMPONENTE REUTILIZABLE: MODAL TARJETA (Para Eliminar) */}
+      {/* MODAL ADVERTENCIA SUBIDA (Reutilizando ModalTarjeta) */}
+      <ModalTarjeta
+        isOpen={modalSubidaAbierto}
+        onClose={() => setModalSubidaAbierto(false)}
+        onConfirm={() => fileInputRef.current?.click()}
+        titulo="Atención al Formato"
+        descripcion="Para que el sistema lea el documento correctamente, el archivo debe contener los separadores (======) y los títulos (## ). Si no estás seguro, te recomendamos descargar el ejemplo primero o usar el botón 'Agregar Pregunta'."
+        textoConfirmar="Seleccionar archivo"
+        textoCancelar="Cancelar"
+        cargando={subiendoArchivo}
+        esDestructivo={false}
+      />
+
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
       <ModalTarjeta
         isOpen={!!moduloAEliminar}
         onClose={() => setModuloAEliminar(null)}
@@ -401,11 +527,12 @@ export default function DocumentacionPage() {
         esDestructivo={true}
       />
 
+      {/* MODAL DE ALERTA GENERAL */}
       <ModalTarjeta
         isOpen={!!alertModal}
         onClose={() => setAlertModal(null)}
         onConfirm={() => setAlertModal(null)}
-        titulo="Error"
+        titulo="Aviso"
         descripcion={alertModal ?? ''}
         textoConfirmar="Aceptar"
         textoCancelar="Cerrar"

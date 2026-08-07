@@ -14,6 +14,10 @@ import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
 import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
+// IMPORTAMOS LAS LIBRERÍAS DE EXCEL
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+
 const USUARIOS_POR_PAGINA = 10;
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -183,6 +187,7 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null);
   const [actualizandoId, setActualizandoId] = useState<string | null>(null);
   const [errorFila, setErrorFila] = useState<string | null>(null);
+  const [descargandoExcel, setDescargandoExcel] = useState(false);
 
   const [busqueda, setBusqueda] = useState('');
   const [busquedaDebounced, setBusquedaDebounced] = useState('');
@@ -300,6 +305,114 @@ export default function UsuariosPage() {
     }
   };
 
+  // ==========================================
+  // FUNCIÓN PARA GENERAR UN EXCEL PREMIUM
+  // ==========================================
+  const generarExcel = async () => {
+    try {
+      setDescargandoExcel(true);
+      
+      // Hacemos una llamada directa para traer ABSOLUTAMENTE TODOS los usuarios (sin paginación)
+      // Así el reporte no se queda solo con los 10 de la página actual.
+      const [todosLosUsuarios, todoElProgreso] = await Promise.all([
+        usuarioService.listarTodos(),
+        progresoService.listarTodoAdmin()
+      ]);
+
+      const progresoMap = new Map(todoElProgreso.map((p) => [p.usuario_id, p]));
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Directorio del Personal', {
+        views: [{ showGridLines: false }]
+      });
+
+      sheet.columns = [
+        { header: '', key: 'nombre', width: 35 },
+        { header: '', key: 'email', width: 40 },
+        { header: '', key: 'departamento', width: 25 },
+        { header: '', key: 'rol', width: 25 },
+        { header: '', key: 'eco', width: 18 },
+        { header: '', key: 'est', width: 18 },
+        { header: '', key: 'enc', width: 18 },
+        { header: '', key: 'tot', width: 18 }
+      ];
+
+      // ESTILOS PREMIUM
+      const colorNaranja = 'FFD85A30'; 
+      const colorOscuro = 'FF1F2937';  
+
+      // Título principal gigante
+      const mainTitle = sheet.addRow(['DIRECTORIO DE USUARIOS Y PROGRESO FORMATIVO']);
+      sheet.mergeCells('A1:H1');
+      mainTitle.height = 40;
+      mainTitle.getCell(1).font = { name: 'Calibri', size: 18, bold: true, color: { argb: colorNaranja } };
+      mainTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      
+      const subTitle = sheet.addRow([`Reporte generado el: ${new Date().toLocaleDateString()}`]);
+      sheet.mergeCells('A2:H2');
+      subTitle.getCell(1).font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF6B7280' } };
+      subTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      sheet.addRow([]); // Espacio
+
+      // Cabeceras de tabla
+      const headers = ['Nombre Completo', 'Correo Electrónico', 'Departamento', 'Rol y Accesos', 'Progreso Ecosistema', 'Progreso Estudio', 'Progreso Encuestas', 'PROGRESO TOTAL'];
+      const rowHeader = sheet.addRow(headers);
+      rowHeader.height = 30;
+      
+      rowHeader.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+        // Hacemos que las cabeceras de progreso destaquen un poco diferente
+        const isProgreso = colNumber >= 5;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isProgreso ? colorOscuro : colorNaranja } };
+        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: isProgreso ? 'center' : 'left' };
+      });
+
+      // Filas de Datos (Cebra)
+      let rowCounter = 0;
+      todosLosUsuarios.forEach(u => {
+        rowCounter++;
+        const p = progresoMap.get(u.id);
+
+        const row = sheet.addRow([
+          u.nombre,
+          u.email,
+          u.departamento || 'Sin asignar',
+          etiquetaRol(u.rol),
+          p ? `${Math.round(p.porcentaje_ecosistema)}%` : '0%',
+          p ? `${Math.round(p.porcentaje_estudio)}%` : '0%',
+          p ? `${Math.round(p.porcentaje_encuesta)}%` : '0%',
+          p ? `${Math.round(p.porcentaje_total)}%` : '0%'
+        ]);
+
+        const isPar = rowCounter % 2 === 0;
+
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          const isProgreso = colNumber >= 5;
+          cell.font = { name: 'Calibri', size: 11, color: { argb: isProgreso ? 'FF111827' : 'FF4B5563' }, bold: colNumber === 8 };
+          cell.alignment = { vertical: 'middle', horizontal: isProgreso ? 'center' : 'left' };
+          cell.border = {
+            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+          };
+          if (isPar) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          }
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const fechaArchivo = new Date().toISOString().split('T')[0];
+      saveAs(blob, `Directorio_Usuarios_Delphos_${fechaArchivo}.xlsx`);
+
+    } catch (err) {
+      console.error('Error generando Excel:', err);
+      setErrorFila('Hubo un error al generar el archivo Excel.');
+    } finally {
+      setDescargandoExcel(false);
+    }
+  };
+
   const usuariosOrdenados = [...usuarios].sort((a, b) => {
     const prioridad = (u: UsuarioListado) => (u.rol === 'administrador' ? 0 : 1);
     const diff = prioridad(a) - prioridad(b);
@@ -323,12 +436,35 @@ export default function UsuariosPage() {
           </p>
         </div>
         
-        {!cargando && !error && paginacion && (
-          <div className="flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-3">Total Registrados</span>
-            <span className="text-base font-black text-gray-900">{paginacion.total}</span>
-          </div>
-        )}
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          {!cargando && !error && paginacion && (
+            <div className="flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm h-[44px]">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-3">Total Registrados</span>
+              <span className="text-base font-black text-gray-900">{paginacion.total}</span>
+            </div>
+          )}
+          
+          <button
+            onClick={generarExcel}
+            disabled={cargando || !!error || descargandoExcel}
+            className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50 disabled:pointer-events-none h-[44px]"
+            title="Descargar directorio completo en Excel"
+          >
+            {descargandoExcel ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                Generando Excel...
+              </div>
+            ) : (
+              <>
+                <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Descargar Directorio
+              </>
+            )}
+          </button>
+        </div>
       </header>
 
       <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
@@ -368,7 +504,7 @@ export default function UsuariosPage() {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            No se pudo actualizar el rol: {errorFila}
+            Error: {errorFila}
           </div>
         )}
 
