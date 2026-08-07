@@ -109,7 +109,7 @@ export default function EncuestasPage() {
   const [fechaHastaResultados, setFechaHastaResultados] = useState('');
   const hayFiltrosResultados = !!departamentoResultados || !!fechaDesdeResultados || !!fechaHastaResultados;
 
-  // Código de acceso de la encuesta (el que el pasante tiene que ingresar en /encuesta).
+  // Código de acceso de la encuesta
   const [modalCodigoAbierto, setModalCodigoAbierto] = useState(false);
   const [codigoActual, setCodigoActual] = useState<string | null>(null);
   const [codigoEditado, setCodigoEditado] = useState('');
@@ -141,6 +141,7 @@ export default function EncuestasPage() {
     return () => { cancelado = true; clearInterval(intId); };
   }, []);
 
+  // Carga de resultados con Polling Silencioso
   useEffect(() => {
     if (vista !== 'resultados') return;
     let cancelado = false;
@@ -286,13 +287,43 @@ export default function EncuestasPage() {
     }
   };
 
+  const abrirModalCodigo = () => {
+    setModalCodigoAbierto(true);
+    setErrorCodigo(null);
+    setCodigoGuardadoOk(false);
+    setCargandoCodigo(true);
+    encuestaService
+      .obtenerCodigo()
+      .then((data) => {
+        setCodigoActual(data.codigo);
+        setCodigoEditado(data.codigo);
+      })
+      .catch((err: Error) => setErrorCodigo(err.message))
+      .finally(() => setCargandoCodigo(false));
+  };
+
+  const handleGuardarCodigo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setGuardandoCodigo(true);
+    setErrorCodigo(null);
+    setCodigoGuardadoOk(false);
+    try {
+      const data = await encuestaService.actualizarCodigo(codigoEditado.trim());
+      setCodigoActual(data.codigo);
+      setCodigoGuardadoOk(true);
+    } catch (err) {
+      setErrorCodigo((err as Error).message);
+    } finally {
+      setGuardandoCodigo(false);
+    }
+  };
+
   // ==========================================
   // FUNCIÓN: GENERAR EXCEL GENERAL DE ENCUESTAS
   // ==========================================
   const generarExcelGeneral = async () => {
     try {
       setDescargandoGeneral(true);
-      
       const todosLosResultados = await encuestaService.obtenerTodosLosResultados();
       
       const workbook = new ExcelJS.Workbook();
@@ -402,7 +433,6 @@ export default function EncuestasPage() {
         });
 
         grupo.respuestas.forEach((resp, i) => {
-          // CORRECCIÓN APLICADA AQUÍ: bypass de TS usando as any
           const escalaMax = (resp.pregunta as any).escala_max ?? 5;
           const valor = resp.pregunta.tipo_respuesta === 'texto' 
             ? resp.respuesta_texto || 'Sin respuesta' 
@@ -436,34 +466,6 @@ export default function EncuestasPage() {
       setAlertModal('No se pudo generar el reporte de la encuesta del usuario.');
     } finally {
       setDescargandoUsuario(false);
-  const abrirModalCodigo = () => {
-    setModalCodigoAbierto(true);
-    setErrorCodigo(null);
-    setCodigoGuardadoOk(false);
-    setCargandoCodigo(true);
-    encuestaService
-      .obtenerCodigo()
-      .then((data) => {
-        setCodigoActual(data.codigo);
-        setCodigoEditado(data.codigo);
-      })
-      .catch((err: Error) => setErrorCodigo(err.message))
-      .finally(() => setCargandoCodigo(false));
-  };
-
-  const handleGuardarCodigo = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setGuardandoCodigo(true);
-    setErrorCodigo(null);
-    setCodigoGuardadoOk(false);
-    try {
-      const data = await encuestaService.actualizarCodigo(codigoEditado.trim());
-      setCodigoActual(data.codigo);
-      setCodigoGuardadoOk(true);
-    } catch (err) {
-      setErrorCodigo((err as Error).message);
-    } finally {
-      setGuardandoCodigo(false);
     }
   };
 
@@ -489,46 +491,45 @@ export default function EncuestasPage() {
         </div>
 
         {!sesionExpirada && (
-          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
-        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center shrink-0">
-          <button
-            onClick={abrirModalCodigo}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-all hover:border-gray-400 hover:text-gray-900"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
-              />
-            </svg>
-            Código de acceso
-          </button>
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center shrink-0">
+            <button
+              onClick={abrirModalCodigo}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-all hover:border-gray-400 hover:text-gray-900"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
+                />
+              </svg>
+              Código de acceso
+            </button>
 
-          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-            <button
-              onClick={() => setVista('preguntas')}
-              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
-                vista === 'preguntas'
-                  ? 'bg-gray-900 text-white shadow-md'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              Preguntas
-            </button>
-            <button
-              onClick={() => setVista('resultados')}
-              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
-                vista === 'resultados'
-                  ? 'bg-gray-900 text-white shadow-md'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              Resultados
-            </button>
+            <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+              <button
+                onClick={() => setVista('preguntas')}
+                className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+                  vista === 'preguntas'
+                    ? 'bg-gray-900 text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                Preguntas
+              </button>
+              <button
+                onClick={() => setVista('resultados')}
+                className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+                  vista === 'resultados'
+                    ? 'bg-gray-900 text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                Resultados
+              </button>
+            </div>
           </div>
         )}
-        </div>
       </header>
 
       {sesionExpirada ? (
@@ -925,55 +926,6 @@ export default function EncuestasPage() {
         </div>
       )}
 
-      {!sesionExpirada && (
-        <ModalTarjeta
-          isOpen={!!preguntaAEliminar}
-          onClose={() => setPreguntaAEliminar(null)}
-          onConfirm={ejecutarEliminacion}
-          titulo={preguntaAEliminar ? `¿Eliminar la pregunta "${preguntaAEliminar.pregunta}"?` : '¿Eliminar pregunta?'}
-          descripcion="Quedará oculta, no se borra del historial."
-          textoConfirmar="Eliminar"
-          textoCancelar="Cancelar"
-          cargando={eliminandoPregunta}
-          esDestructivo={true}
-        />
-      )}
-
-      {!sesionExpirada && (
-        <ModalTarjeta
-          isOpen={!!alertModal}
-          onClose={() => setAlertModal(null)}
-          onConfirm={() => setAlertModal(null)}
-          titulo="Error"
-          descripcion={alertModal ?? ''}
-          textoConfirmar="Aceptar"
-          textoCancelar="Cerrar"
-        />
-      )}
-
-      {!sesionExpirada && resultadoSeleccionado && (
-      <ModalTarjeta
-        isOpen={!!preguntaAEliminar}
-        onClose={() => setPreguntaAEliminar(null)}
-        onConfirm={ejecutarEliminacion}
-        titulo={preguntaAEliminar ? `¿Eliminar la pregunta "${preguntaAEliminar.pregunta}"?` : '¿Eliminar pregunta?'}
-        descripcion="Quedará oculta, no se borra del historial."
-        textoConfirmar="Eliminar"
-        textoCancelar="Cancelar"
-        cargando={eliminandoPregunta}
-        esDestructivo={true}
-      />
-
-      <ModalTarjeta
-        isOpen={!!alertModal}
-        onClose={() => setAlertModal(null)}
-        onConfirm={() => setAlertModal(null)}
-        titulo="Error"
-        descripcion={alertModal ?? ''}
-        textoConfirmar="Aceptar"
-        textoCancelar="Cerrar"
-      />
-
       {modalCodigoAbierto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm"
@@ -1042,7 +994,33 @@ export default function EncuestasPage() {
         </div>
       )}
 
-      {resultadoSeleccionado && (
+      {!sesionExpirada && (
+        <ModalTarjeta
+          isOpen={!!preguntaAEliminar}
+          onClose={() => setPreguntaAEliminar(null)}
+          onConfirm={ejecutarEliminacion}
+          titulo={preguntaAEliminar ? `¿Eliminar la pregunta "${preguntaAEliminar.pregunta}"?` : '¿Eliminar pregunta?'}
+          descripcion="Quedará oculta, no se borra del historial."
+          textoConfirmar="Eliminar"
+          textoCancelar="Cancelar"
+          cargando={eliminandoPregunta}
+          esDestructivo={true}
+        />
+      )}
+
+      {!sesionExpirada && (
+        <ModalTarjeta
+          isOpen={!!alertModal}
+          onClose={() => setAlertModal(null)}
+          onConfirm={() => setAlertModal(null)}
+          titulo="Error"
+          descripcion={alertModal ?? ''}
+          textoConfirmar="Aceptar"
+          textoCancelar="Cerrar"
+        />
+      )}
+
+      {!sesionExpirada && resultadoSeleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden">
             
@@ -1154,7 +1132,6 @@ export default function EncuestasPage() {
                 </div>
               ))}
             </div>
-            
           </div>
         </div>
       )}
