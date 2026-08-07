@@ -187,7 +187,34 @@ export default function EncuestaPage() {
   const [yaCompletada, setYaCompletada] = useState(false);
   const [comenzada, setComenzada] = useState(false);
 
+  // Gate del código de acceso: no se persiste en el navegador (localStorage
+  // se comparte entre cuentas distintas logueadas en el mismo dispositivo),
+  // así que hay que ingresarlo cada vez que se entra a esta vista.
+  const [codigoDesbloqueado, setCodigoDesbloqueado] = useState(false);
+  const [codigoIngresado, setCodigoIngresado] = useState('');
+  const [verificandoCodigo, setVerificandoCodigo] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
+
+  const handleVerificarCodigo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setVerificandoCodigo(true);
+    setErrorCodigo(null);
+    try {
+      const { valido } = await encuestaService.verificarCodigo(codigoIngresado);
+      if (valido) {
+        setCodigoDesbloqueado(true);
+      } else {
+        setErrorCodigo('Ese código no es válido. Revisalo e intentá de nuevo.');
+      }
+    } catch (err) {
+      setErrorCodigo((err as Error).message);
+    } finally {
+      setVerificandoCodigo(false);
+    }
+  };
+
   useEffect(() => {
+    if (!codigoDesbloqueado) return;
     // Se chequea si ya la completó antes de cargar las preguntas: así no lo
     // dejamos ni empezarla de nuevo, en vez de descubrirlo recién al enviar.
     encuestaService
@@ -203,7 +230,7 @@ export default function EncuestaPage() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setCargando(false));
-  }, []);
+  }, [codigoDesbloqueado]);
 
   const secciones = useMemo(() => {
     const vistas = new Set<string>();
@@ -295,6 +322,49 @@ export default function EncuestaPage() {
   };
 
   // Envolvemos todo en un div maestro blanco
+  if (!codigoDesbloqueado) {
+    return (
+      <div className="flex flex-col flex-1 w-full bg-white">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-16">
+          <div className="w-full rounded-3xl border border-default bg-neutral-primary p-8 text-center shadow-sm sm:p-10">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-orange/10">
+              <svg className="h-7 w-7 text-brand-orange" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"
+                />
+              </svg>
+            </div>
+            <h1 className="mt-5 text-xl font-bold text-heading sm:text-2xl">Encuesta protegida</h1>
+            <p className="mt-2 text-sm leading-relaxed text-body">
+              Ingresá el código de acceso que te compartieron para responder la encuesta de
+              satisfacción.
+            </p>
+            <form onSubmit={handleVerificarCodigo} className="mt-6 flex flex-col gap-3">
+              <input
+                type="text"
+                value={codigoIngresado}
+                onChange={(e) => setCodigoIngresado(e.target.value)}
+                placeholder="Código de acceso"
+                autoFocus
+                className="w-full rounded-lg border border-default px-4 py-2.5 text-center text-sm font-semibold uppercase tracking-widest text-heading outline-none transition-colors focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20"
+              />
+              {errorCodigo && <p className="text-xs font-medium text-red-600">{errorCodigo}</p>}
+              <button
+                type="submit"
+                disabled={verificandoCodigo || !codigoIngresado.trim()}
+                className="mt-1 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-orange px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {verificandoCodigo ? 'Verificando...' : 'Desbloquear encuesta'}
+              </button>
+            </form>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   if (cargando) {
     return (
       <div className="flex flex-col flex-1 w-full bg-white">

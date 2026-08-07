@@ -103,6 +103,15 @@ export default function EncuestasPage() {
   const [fechaHastaResultados, setFechaHastaResultados] = useState('');
   const hayFiltrosResultados = !!departamentoResultados || !!fechaDesdeResultados || !!fechaHastaResultados;
 
+  // Código de acceso de la encuesta (el que el pasante tiene que ingresar en /encuesta).
+  const [modalCodigoAbierto, setModalCodigoAbierto] = useState(false);
+  const [codigoActual, setCodigoActual] = useState<string | null>(null);
+  const [codigoEditado, setCodigoEditado] = useState('');
+  const [cargandoCodigo, setCargandoCodigo] = useState(false);
+  const [guardandoCodigo, setGuardandoCodigo] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
+  const [codigoGuardadoOk, setCodigoGuardadoOk] = useState(false);
+
   // Carga de preguntas con Polling Silencioso
   useEffect(() => {
     let cancelado = false;
@@ -273,6 +282,37 @@ export default function EncuestasPage() {
     }
   };
 
+  const abrirModalCodigo = () => {
+    setModalCodigoAbierto(true);
+    setErrorCodigo(null);
+    setCodigoGuardadoOk(false);
+    setCargandoCodigo(true);
+    encuestaService
+      .obtenerCodigo()
+      .then((data) => {
+        setCodigoActual(data.codigo);
+        setCodigoEditado(data.codigo);
+      })
+      .catch((err: Error) => setErrorCodigo(err.message))
+      .finally(() => setCargandoCodigo(false));
+  };
+
+  const handleGuardarCodigo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setGuardandoCodigo(true);
+    setErrorCodigo(null);
+    setCodigoGuardadoOk(false);
+    try {
+      const data = await encuestaService.actualizarCodigo(codigoEditado.trim());
+      setCodigoActual(data.codigo);
+      setCodigoGuardadoOk(true);
+    } catch (err) {
+      setErrorCodigo((err as Error).message);
+    } finally {
+      setGuardandoCodigo(false);
+    }
+  };
+
   const esErrorSesionPreguntas = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
   const esErrorSesionResultados = errorResultados?.toLowerCase().includes('token') || errorResultados?.toLowerCase().includes('expirad');
 
@@ -293,27 +333,43 @@ export default function EncuestasPage() {
           </p>
         </div>
 
-        <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center shrink-0">
           <button
-            onClick={() => setVista('preguntas')}
-            className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
-              vista === 'preguntas'
-                ? 'bg-gray-900 text-white shadow-md'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-            }`}
+            onClick={abrirModalCodigo}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-all hover:border-gray-400 hover:text-gray-900"
           >
-            Preguntas
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth="1.75" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
+              />
+            </svg>
+            Código de acceso
           </button>
-          <button
-            onClick={() => setVista('resultados')}
-            className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
-              vista === 'resultados'
-                ? 'bg-gray-900 text-white shadow-md'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            Resultados
-          </button>
+
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+            <button
+              onClick={() => setVista('preguntas')}
+              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+                vista === 'preguntas'
+                  ? 'bg-gray-900 text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Preguntas
+            </button>
+            <button
+              onClick={() => setVista('resultados')}
+              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+                vista === 'resultados'
+                  ? 'bg-gray-900 text-white shadow-md'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Resultados
+            </button>
+          </div>
         </div>
       </header>
 
@@ -711,6 +767,74 @@ export default function EncuestasPage() {
         textoConfirmar="Aceptar"
         textoCancelar="Cerrar"
       />
+
+      {modalCodigoAbierto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm"
+          onClick={() => setModalCodigoAbierto(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-3xl bg-white p-8 shadow-2xl"
+          >
+            <h2 className="text-xl font-extrabold text-gray-900">Código de acceso</h2>
+            <p className="mt-1.5 text-sm text-gray-500">
+              El pasante tiene que ingresar este código en <span className="font-mono">/encuesta</span>{' '}
+              antes de poder responderla. Cambialo cuando arranque una nueva cohorte.
+            </p>
+
+            {cargandoCodigo ? (
+              <div className="mt-6 flex justify-center py-4">
+                <div className="h-6 w-6 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+              </div>
+            ) : (
+              <form onSubmit={handleGuardarCodigo} className="mt-6 flex flex-col gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                    Código vigente
+                  </label>
+                  <input
+                    type="text"
+                    value={codigoEditado}
+                    onChange={(e) => setCodigoEditado(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-center text-sm font-bold uppercase tracking-widest text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                    required
+                  />
+                </div>
+
+                {errorCodigo && (
+                  <p className="text-xs font-medium text-red-600">{errorCodigo}</p>
+                )}
+                {codigoGuardadoOk && (
+                  <p className="text-xs font-medium text-green-600">
+                    Código actualizado. Los pasantes ya lo pueden usar.
+                  </p>
+                )}
+                {codigoActual && (
+                  <p className="text-[11px] text-gray-400">Código actual: {codigoActual}</p>
+                )}
+
+                <div className="mt-2 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setModalCodigoAbierto(false)}
+                    className="rounded-xl px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={guardandoCodigo || !codigoEditado.trim()}
+                    className="rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                  >
+                    {guardandoCodigo ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {resultadoSeleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
