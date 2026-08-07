@@ -64,22 +64,35 @@ export default function VerdaderoFalsoPage() {
     return correctas;
   };
 
-  // AQUÍ ESTÁ EL CAMBIO PARA GUARDAR EL RESULTADO
   const handleSiguiente = async () => {
     if (indiceActual < preguntas.length - 1) {
       setIndiceActual(prev => prev + 1);
     } else {
-      // Guardar en BD antes de ir a resultados
       const user = authService.getCurrentUser();
       if (user) {
+        
+        // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
+        const respuestas_detalle = preguntas.map(p => {
+          const seleccion = respuestasUsuario[p.id];
+          const esCorrecta = seleccion ? p.respuesta_correcta.trim().toLowerCase() === seleccion.toLowerCase() : false;
+
+          return {
+            pregunta: p.pregunta,
+            respuesta_usuario: seleccion || 'Sin responder',
+            respuesta_correcta: p.respuesta_correcta,
+            es_correcta: esCorrecta
+          };
+        });
+        
         try {
+          // @ts-ignore
           await estudioService.guardarResultado({
             usuario_id: user.id,
             metodo: 'verdadero_falso',
             puntuacion: calcularPuntuacion(),
-            total_preguntas: preguntas.length
+            total_preguntas: preguntas.length,
+            respuestas_detalle // LO ENVIAMOS AL BACKEND
           });
-          // Refresca el progreso global (ej. el badge del navbar) sin esperar a un reload.
           useProgresoStore.getState().cargar();
         } catch (err) {
           console.error("No se pudo guardar la nota en la bd", err);

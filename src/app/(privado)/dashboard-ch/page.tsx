@@ -15,6 +15,7 @@ import {
   YAxis,
   BarChart,
   Bar,
+  LabelList,
 } from 'recharts';
 import { usuarioService, type UsuarioListado } from '@/services/usuarioService';
 import {
@@ -22,8 +23,8 @@ import {
   type PreguntaSatisfaccion,
   type ResultadoEncuesta,
 } from '@/services/encuestaService';
+import { estudioService, type ResultadoEstudio } from '@/services/estudioService';
 
-// IMPORTAMOS TU COMPONENTE DE SESIÓN EXPIRADA
 import SessionExpired from '@/components/global/SessionExpired';
 
 // ============================================================================
@@ -39,12 +40,7 @@ const FECHA_HOY = new Intl.DateTimeFormat('es-CR', {
 
 const formatoFechaCorta = new Intl.DateTimeFormat('es', { day: '2-digit', month: 'short' });
 
-// Paleta de marca modernizada para los gráficos
 const COLORES = ['#d85a30', '#1f2937', '#f97316', '#9ca3af', '#fb923c'];
-
-// ============================================================================
-// ICONOS (Con trazos más elegantes)
-// ============================================================================
 
 function IconoUsuarios() {
   return (
@@ -77,10 +73,6 @@ function IconoLista() {
     </svg>
   );
 }
-
-// ============================================================================
-// COMPONENTES AUXILIARES REDISEÑADOS
-// ============================================================================
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -119,50 +111,118 @@ function TarjetaKpi({ etiqueta, valor, detalle, icono }: TarjetaKpiProps) {
   );
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL
-// ============================================================================
-
 export default function DashboardCH() {
   const { user } = useAuth();
 
-  // Estados
   const [usuarios, setUsuarios] = useState<UsuarioListado[]>([]);
-  const [resultados, setResultados] = useState<ResultadoEncuesta[]>([]);
+  const [resultadosEncuestas, setResultadosEncuestas] = useState<ResultadoEncuesta[]>([]);
+  const [resultadosEstudio, setResultadosEstudio] = useState<ResultadoEstudio[]>([]);
   const [preguntas, setPreguntas] = useState<PreguntaSatisfaccion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
   const [seccionActiva, setSeccionActiva] = useState<string | null>(null);
 
-  // Carga de datos
+  // Polling silencioso
   useEffect(() => {
     let cancelado = false;
-    setCargando(true);
-    setError(null);
-    Promise.all([
-      usuarioService.listarTodos(),
-      encuestaService.obtenerTodosLosResultados(),
-      encuestaService.listar(),
-    ])
-      .then(([datosUsuarios, datosResultados, datosPreguntas]) => {
-        if (cancelado) return;
-        setUsuarios(datosUsuarios);
-        setResultados(datosResultados);
-        setPreguntas(datosPreguntas);
-      })
-      .catch((err: Error) => {
-        if (!cancelado) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelado) setCargando(false);
-      });
-    return () => {
-      cancelado = true;
+    
+    const cargarDatos = async (fondo = false) => {
+      if (!fondo) setCargando(true);
+      try {
+        const [datosUsuarios, datosResultadosEncuesta, datosPreguntas, datosEstudio] = await Promise.all([
+          usuarioService.listarTodos(),
+          encuestaService.obtenerTodosLosResultados(),
+          encuestaService.listar(),
+          estudioService.obtenerResultados()
+        ]);
+        if (!cancelado) {
+          setUsuarios(datosUsuarios);
+          setResultadosEncuestas(datosResultadosEncuesta);
+          setPreguntas(datosPreguntas);
+          setResultadosEstudio(datosEstudio);
+          setError(null);
+        }
+      } catch (err: any) {
+        if (!cancelado && !fondo) setError(err.message);
+      } finally {
+        if (!cancelado && !fondo) setCargando(false);
+      }
     };
+
+    cargarDatos(false);
+    const intId = setInterval(() => cargarDatos(true), 10000); // Actualización en tiempo real (10s)
+    return () => { cancelado = true; clearInterval(intId); };
   }, [intentos]);
 
-  // Cálculos
+  // ==========================================
+  // CÁLCULOS ESTUDIOS
+  // ==========================================
+  const metricasEstudio = useMemo(() => {
+    let cuestionarioScore = 0;
+    let cuestionarioMax = 0;
+    let cuestionarioCount = 0;
+
+    let vfScore = 0;
+    let vfMax = 0;
+    let vfCount = 0;
+
+    let flashcardCount = 0;
+    let flashcardsVistas = 0;
+
+    resultadosEstudio.forEach((r) => {
+      if (r.metodo === 'cuestionario') {
+        cuestionarioCount++;
+        if (r.puntuacion != null && r.total_preguntas) {
+          cuestionarioScore += r.puntuacion;
+          cuestionarioMax += r.total_preguntas;
+        }
+      } else if (r.metodo === 'verdadero_falso') {
+        vfCount++;
+        if (r.puntuacion != null && r.total_preguntas) {
+          vfScore += r.puntuacion;
+          vfMax += r.total_preguntas;
+        }
+      } else if (r.metodo === 'flashcard') {
+        flashcardCount++;
+        if (r.total_preguntas) {
+          flashcardsVistas += r.total_preguntas;
+        }
+      }
+    });
+
+    const promedioCuestionario = cuestionarioMax > 0 ? Math.round((cuestionarioScore / cuestionarioMax) * 100) : 0;
+    const promedioVF = vfMax > 0 ? Math.round((vfScore / vfMax) * 100) : 0;
+    
+    const datosGrafica = [
+      { metodo: 'Cuestionarios', promedio: promedioCuestionario, sesiones: cuestionarioCount, fill: '#f97316' },
+      { metodo: 'Verdadero / Falso', promedio: promedioVF, sesiones: vfCount, fill: '#1f2937' }
+    ];
+
+    return {
+      datosGrafica,
+      flashcardCount,
+      flashcardsVistas,
+    };
+  }, [resultadosEstudio]);
+
+  const CustomTooltipEstudio = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100">
+          <p className="font-bold text-gray-900 mb-1">{data.metodo}</p>
+          <p className="text-sm text-brand-orange font-bold">Promedio: {data.promedio}%</p>
+          <p className="text-xs text-gray-500 mt-1">{data.sesiones} sesiones completadas</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // ==========================================
+  // CÁLCULOS ENCUESTAS Y USUARIOS
+  // ==========================================
   const porDepartamento = useMemo(() => {
     const conteo = new Map<string, number>();
     usuarios.forEach((u) => {
@@ -182,20 +242,20 @@ export default function DashboardCH() {
 
   const completadasPorDia = useMemo(() => {
     const conteo = new Map<string, number>();
-    resultados.forEach((r) => {
+    resultadosEncuestas.forEach((r) => {
       const clave = r.fecha_completado.slice(0, 10);
       conteo.set(clave, (conteo.get(clave) ?? 0) + 1);
     });
     return Array.from(conteo, ([fecha, valor]) => ({ fecha, valor }))
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
       .map((d) => ({ ...d, etiqueta: formatoFechaCorta.format(new Date(d.fecha)) }));
-  }, [resultados]);
+  }, [resultadosEncuestas]);
 
   const promedioPorPregunta = useMemo(() => {
     return preguntas
       .filter((p) => p.tipo_respuesta === 'escala' && p.escala_max)
       .map((p) => {
-        const valores = resultados
+        const valores = resultadosEncuestas
           .flatMap((r) => r.respuestas)
           .filter((r) => r.pregunta.id === p.id && r.respuesta_numerica != null)
           .map((r) => r.respuesta_numerica as number);
@@ -213,7 +273,7 @@ export default function DashboardCH() {
       })
       .filter((p): p is typeof p & { promedio: number } => p.promedio !== null)
       .sort((a, b) => a.seccion.localeCompare(b.seccion, 'es'));
-  }, [preguntas, resultados]);
+  }, [preguntas, resultadosEncuestas]);
 
   const promedioPorSeccion = useMemo(() => {
     const grupos = new Map<string, typeof promedioPorPregunta>();
@@ -245,23 +305,16 @@ export default function DashboardCH() {
       : null;
 
   const tasaFinalizacion =
-    usuarios.length > 0 ? Math.min(100, Math.round((resultados.length / usuarios.length) * 100)) : 0;
+    usuarios.length > 0 ? Math.min(100, Math.round((resultadosEncuestas.length / usuarios.length) * 100)) : 0;
 
   const grupoActivo = promedioPorSeccion.find((g) => g.seccion === seccionActiva);
 
-  // Verificamos si el error es por token expirado/inválido
   const esErrorSesion = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
-
-  // ============================================================================
-  // RENDERIZADO
-  // ============================================================================
 
   if (!user) return null;
 
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
-      
-      {/* HEADER ELEGANTE */}
       <header className="mb-10">
         <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
           {FECHA_HOY}
@@ -274,7 +327,6 @@ export default function DashboardCH() {
         </p>
       </header>
 
-      {/* SECCIÓN: TU SESIÓN (Estilo Banner) */}
       <section className="mb-10 overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900 to-gray-800 p-8 shadow-xl relative text-white">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
         
@@ -297,7 +349,6 @@ export default function DashboardCH() {
         </div>
       </section>
 
-      {/* SECCIÓN PRINCIPAL DE MÉTRICAS */}
       <section>
         <Eyebrow>Análisis de Rendimiento</Eyebrow>
 
@@ -334,15 +385,13 @@ export default function DashboardCH() {
         ) : (
           <div className="space-y-8">
             
-            {/* 1. KPIs */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <TarjetaKpi etiqueta="Total Usuarios" valor={String(usuarios.length)} icono={<IconoUsuarios />} />
-              <TarjetaKpi etiqueta="Completaron Encuesta" valor={String(resultados.length)} detalle={`${tasaFinalizacion}% de la plantilla`} icono={<IconoCheck />} />
+              <TarjetaKpi etiqueta="Completaron Encuesta" valor={String(resultadosEncuestas.length)} detalle={`${tasaFinalizacion}% de la plantilla`} icono={<IconoCheck />} />
               <TarjetaKpi etiqueta="Satisfacción Global" valor={indiceSatisfaccion !== null ? `${indiceSatisfaccion}%` : '—'} detalle="Basado en escala 1-5" icono={<IconoEstrella />} />
               <TarjetaKpi etiqueta="Preguntas Activas" valor={String(promedioPorPregunta.length)} icono={<IconoLista />} />
             </div>
 
-            {/* 2. GRÁFICAS DE PASTEL */}
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <div className="rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 mb-6">Usuarios por Departamento</h3>
@@ -379,7 +428,84 @@ export default function DashboardCH() {
               </div>
             </div>
 
-            {/* 3. DESGLOSE DE ENCUESTAS */}
+            {/* =======================================================
+                RESULTADOS DE ESTUDIO (GRÁFICA HORIZONTAL CORREGIDA)
+                ======================================================= */}
+            <div className="rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900">Desempeño en Aprendizaje</h3>
+                  <p className="mt-1 text-sm text-gray-500">Métricas globales de asimilación de conocimiento.</p>
+                </div>
+              </div>
+
+              {resultadosEstudio.length === 0 ? (
+                <div className="py-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <p className="text-sm font-medium text-gray-500">Aún no hay datos de estudio suficientes para generar el reporte.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                  
+                  {/* Gráfica de Barras Horizontales */}
+                  <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-gray-50/50 p-6 flex flex-col justify-center">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6">Promedios de Evaluación Global</h4>
+                    <div className="h-[200px] w-full pr-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={metricasEstudio.datosGrafica} 
+                          layout="vertical" 
+                          margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
+                          barSize={32}
+                        >
+                          <XAxis type="number" domain={[0, 100]} hide />
+                          <YAxis 
+                            dataKey="metodo" 
+                            type="category" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#4b5563', fontSize: 13, fontWeight: 700 }} 
+                            width={140} 
+                          />
+                          <Tooltip cursor={{ fill: '#f3f4f6' }} content={<CustomTooltipEstudio />} />
+                          <Bar dataKey="promedio" radius={[0, 8, 8, 0]}>
+                            {
+                              metricasEstudio.datosGrafica.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                              ))
+                            }
+                            {/* CORRECCIÓN APLICADA AQUÍ: val as any */}
+                            <LabelList 
+                              dataKey="promedio" 
+                              position="right" 
+                              formatter={(val: any) => `${val}%`} 
+                              fill="#111827" 
+                              fontSize={15} 
+                              fontWeight={800} 
+                            />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-4">
+                     <div className="flex-1 rounded-2xl border border-brand-orange/20 bg-brand-orange/5 p-6 shadow-sm flex flex-col justify-center text-center transition-all hover:bg-brand-orange/10">
+                         <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-2">Práctica Activa</span>
+                         <span className="text-4xl font-black text-brand-orange">{metricasEstudio.flashcardsVistas}</span>
+                         <span className="text-xs font-semibold text-gray-600 mt-1">Tarjetas (Flashcards) repasadas</span>
+                     </div>
+                     <div className="flex-1 rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-sm flex flex-col justify-center text-center transition-all hover:bg-gray-800">
+                         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Sesiones de Repaso</span>
+                         <span className="text-4xl font-black text-white">{metricasEstudio.flashcardCount}</span>
+                         <span className="text-xs font-semibold text-gray-400 mt-1">Prácticas libres completadas</span>
+                     </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            {/* SATISFACCIÓN DETALLADA (ENCUESTAS) */}
             <div className="rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                 <div>
@@ -455,7 +581,6 @@ export default function DashboardCH() {
               )}
             </div>
 
-            {/* 4. GRÁFICA DE BARRAS */}
             <div className="rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
               <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900 mb-2">Tráfico de Evaluaciones</h3>
               <p className="text-sm text-gray-500 mb-8">Volumen de encuestas completadas por fecha.</p>

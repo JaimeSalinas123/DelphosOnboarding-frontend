@@ -9,6 +9,7 @@ import {
   type TipoRespuesta,
 } from '@/services/encuestaService';
 import type { Paginacion } from '@/lib/paginacion';
+import ModalTarjeta from '@/components/global/ModalTarjeta';
 import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
 import SelectorDepartamento from '@/components/global/SelectorDepartamento';
@@ -45,7 +46,6 @@ const formatoFecha = new Intl.DateTimeFormat('es', {
   minute: '2-digit',
 });
 
-/** Agrupa las respuestas de una encuesta por sección, en orden de pregunta. */
 function agruparPorSeccion(resultado: ResultadoEncuesta) {
   const ordenadas = resultado.respuestas
     .slice()
@@ -63,9 +63,6 @@ function agruparPorSeccion(resultado: ResultadoEncuesta) {
   return secciones;
 }
 
-// ============================================================================
-// COMPONENTES AUXILIARES DE DISEÑO
-// ============================================================================
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
@@ -75,9 +72,6 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL
-// ============================================================================
 export default function EncuestasPage() {
   const [vista, setVista] = useState<'preguntas' | 'resultados'>('preguntas');
 
@@ -86,14 +80,15 @@ export default function EncuestasPage() {
   const [error, setError] = useState<string | null>(null);
   const [seccionActiva, setSeccionActiva] = useState('todas');
 
-  // Modal de creación/edición.
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [formulario, setFormulario] = useState<DatosPregunta>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState<string | null>(null);
+  const [preguntaAEliminar, setPreguntaAEliminar] = useState<PreguntaSatisfaccion | null>(null);
+  const [eliminandoPregunta, setEliminandoPregunta] = useState(false);
+  const [alertModal, setAlertModal] = useState<string | null>(null);
 
-  // Resultados: encuestas completadas por los usuarios.
   const [resultados, setResultados] = useState<ResultadoEncuesta[]>([]);
   const [paginacionResultados, setPaginacionResultados] = useState<Paginacion | null>(null);
   const [cargandoResultados, setCargandoResultados] = useState(false);
@@ -103,54 +98,64 @@ export default function EncuestasPage() {
   const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(null);
   const [seccionDetalle, setSeccionDetalle] = useState('todas');
 
-  // Filtros del listado de resultados.
   const [departamentoResultados, setDepartamentoResultados] = useState('');
   const [fechaDesdeResultados, setFechaDesdeResultados] = useState('');
   const [fechaHastaResultados, setFechaHastaResultados] = useState('');
   const hayFiltrosResultados = !!departamentoResultados || !!fechaDesdeResultados || !!fechaHastaResultados;
 
-  const cargarPreguntas = () => {
-    setCargando(true);
-    setError(null);
-    encuestaService
-      .listar()
-      .then(setPreguntas)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setCargando(false));
-  };
-
+  // Carga de preguntas con Polling Silencioso
   useEffect(() => {
-    cargarPreguntas();
+    let cancelado = false;
+    const fetchPreguntas = async (fondo = false) => {
+      if (!fondo) setCargando(true);
+      try {
+        const data = await encuestaService.listar();
+        if (!cancelado) {
+          setPreguntas(data);
+          setError(null);
+        }
+      } catch (err: any) {
+        if (!cancelado && !fondo) setError(err.message);
+      } finally {
+        if (!cancelado && !fondo) setCargando(false);
+      }
+    };
+
+    fetchPreguntas(false);
+    const intId = setInterval(() => fetchPreguntas(true), 10000); // Actualiza cada 10 seg
+    return () => { cancelado = true; clearInterval(intId); };
   }, []);
 
-  // Recarga resultados
+  // Carga de resultados con Polling Silencioso
   useEffect(() => {
     if (vista !== 'resultados') return;
     let cancelado = false;
-    setCargandoResultados(true);
-    setErrorResultados(null);
-    encuestaService
-      .obtenerResultados({
-        pagina: paginaResultados,
-        limite: RESULTADOS_POR_PAGINA,
-        departamento: departamentoResultados || undefined,
-        fechaDesde: fechaDesdeResultados || undefined,
-        fechaHasta: fechaHastaResultados || undefined,
-      })
-      .then((data) => {
-        if (cancelado) return;
-        setResultados(data.resultados);
-        setPaginacionResultados(data.paginacion);
-      })
-      .catch((err: Error) => {
-        if (!cancelado) setErrorResultados(err.message);
-      })
-      .finally(() => {
-        if (!cancelado) setCargandoResultados(false);
-      });
-    return () => {
-      cancelado = true;
+    
+    const fetchResultados = async (fondo = false) => {
+      if (!fondo) setCargandoResultados(true);
+      try {
+        const data = await encuestaService.obtenerResultados({
+          pagina: paginaResultados,
+          limite: RESULTADOS_POR_PAGINA,
+          departamento: departamentoResultados || undefined,
+          fechaDesde: fechaDesdeResultados || undefined,
+          fechaHasta: fechaHastaResultados || undefined,
+        });
+        if (!cancelado) {
+          setResultados(data.resultados);
+          setPaginacionResultados(data.paginacion);
+          setErrorResultados(null);
+        }
+      } catch (err: any) {
+        if (!cancelado && !fondo) setErrorResultados(err.message);
+      } finally {
+        if (!cancelado && !fondo) setCargandoResultados(false);
+      }
     };
+
+    fetchResultados(false);
+    const intId = setInterval(() => fetchResultados(true), 10000); // Actualiza cada 10 seg
+    return () => { cancelado = true; clearInterval(intId); };
   }, [
     vista,
     paginaResultados,
@@ -240,7 +245,9 @@ export default function EncuestasPage() {
         await encuestaService.crear(formulario);
       }
       setModalAbierto(false);
-      cargarPreguntas();
+      // Forzamos una actualización inmediata al guardar
+      const data = await encuestaService.listar();
+      setPreguntas(data);
     } catch (err) {
       setErrorModal((err as Error).message);
     } finally {
@@ -248,28 +255,29 @@ export default function EncuestasPage() {
     }
   };
 
-  const handleEliminar = async (p: PreguntaSatisfaccion) => {
-    if (!window.confirm(`¿Eliminar la pregunta "${p.pregunta}"? Quedará oculta, no se borra del historial.`)) {
-      return;
-    }
+  const handleEliminar = (p: PreguntaSatisfaccion) => {
+    setPreguntaAEliminar(p);
+  };
+
+  const ejecutarEliminacion = async () => {
+    if (!preguntaAEliminar) return;
+    setEliminandoPregunta(true);
     try {
-      await encuestaService.eliminar(p.id);
-      cargarPreguntas();
+      await encuestaService.eliminar(preguntaAEliminar.id);
+      setPreguntas((prev) => prev.filter((preg) => preg.id !== preguntaAEliminar.id));
+      setPreguntaAEliminar(null);
     } catch (err) {
-      window.alert(`No se pudo eliminar: ${(err as Error).message}`);
+      setAlertModal(`No se pudo eliminar: ${(err as Error).message}`);
+    } finally {
+      setEliminandoPregunta(false);
     }
   };
 
   const esErrorSesionPreguntas = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
   const esErrorSesionResultados = errorResultados?.toLowerCase().includes('token') || errorResultados?.toLowerCase().includes('expirad');
 
-  // ============================================================================
-  // RENDERIZADO
-  // ============================================================================
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
-      
-      {/* HEADER ELEGANTE */}
       <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
@@ -285,7 +293,6 @@ export default function EncuestasPage() {
           </p>
         </div>
 
-        {/* NAVEGACIÓN PRINCIPAL (Toggle) */}
         <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
           <button
             onClick={() => setVista('preguntas')}
@@ -310,12 +317,8 @@ export default function EncuestasPage() {
         </div>
       </header>
 
-      {/* ============================================================================
-          VISTA: PREGUNTAS
-          ============================================================================ */}
       {vista === 'preguntas' ? (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
-          
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <Eyebrow>Diseño del Formulario</Eyebrow>
             <button
@@ -329,7 +332,6 @@ export default function EncuestasPage() {
             </button>
           </div>
 
-          {/* PESTAÑAS TIPO PÍLDORA (SECCIONES) - CORREGIDO CON FLEX-WRAP */}
           <div className="flex flex-wrap w-full pb-6 gap-2.5">
             {['todas', ...secciones].map((seccion) => {
               const isActive = seccionActiva === seccion;
@@ -349,7 +351,6 @@ export default function EncuestasPage() {
             })}
           </div>
 
-          {/* TABLA DE PREGUNTAS */}
           {cargando ? (
             <div className="flex flex-col items-center justify-center gap-4 py-24">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
@@ -365,7 +366,7 @@ export default function EncuestasPage() {
                 </div>
                 <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
                 <p className="max-w-sm text-sm text-gray-500">{error}</p>
-                <button onClick={cargarPreguntas} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+                <button onClick={() => setCargando(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
               </div>
             )
           ) : preguntasFiltradas.length === 0 ? (
@@ -422,13 +423,9 @@ export default function EncuestasPage() {
           )}
         </section>
       ) : (
-        /* ============================================================================
-           VISTA: RESULTADOS
-           ============================================================================ */
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <Eyebrow>Registro de Evaluaciones</Eyebrow>
 
-          {/* BARRA DE FILTROS */}
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <SelectorDepartamento
               value={departamentoResultados}
@@ -549,7 +546,6 @@ export default function EncuestasPage() {
             </div>
           )}
 
-          {/* PAGINACIÓN CON EL NUEVO DISEÑO AL 100% WIDTH */}
           {!cargandoResultados && !errorResultados && paginacionResultados && (
             <div className="mt-4 pt-5 border-t border-gray-100 w-full">
               <Paginador paginacion={paginacionResultados} onCambiarPagina={setPaginaResultados} />
@@ -558,9 +554,6 @@ export default function EncuestasPage() {
         </section>
       )}
 
-      {/* ============================================================================
-          MODAL: CREACIÓN / EDICIÓN DE PREGUNTA
-          ============================================================================ */}
       {modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl overflow-hidden">
@@ -697,9 +690,28 @@ export default function EncuestasPage() {
         </div>
       )}
 
-      {/* ============================================================================
-          MODAL: DETALLES DE RESPUESTA DE UN USUARIO
-          ============================================================================ */}
+      <ModalTarjeta
+        isOpen={!!preguntaAEliminar}
+        onClose={() => setPreguntaAEliminar(null)}
+        onConfirm={ejecutarEliminacion}
+        titulo={preguntaAEliminar ? `¿Eliminar la pregunta "${preguntaAEliminar.pregunta}"?` : '¿Eliminar pregunta?'}
+        descripcion="Quedará oculta, no se borra del historial."
+        textoConfirmar="Eliminar"
+        textoCancelar="Cancelar"
+        cargando={eliminandoPregunta}
+        esDestructivo={true}
+      />
+
+      <ModalTarjeta
+        isOpen={!!alertModal}
+        onClose={() => setAlertModal(null)}
+        onConfirm={() => setAlertModal(null)}
+        titulo="Error"
+        descripcion={alertModal ?? ''}
+        textoConfirmar="Aceptar"
+        textoCancelar="Cerrar"
+      />
+
       {resultadoSeleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden">
@@ -728,7 +740,6 @@ export default function EncuestasPage() {
               </button>
             </div>
 
-            {/* PESTAÑAS TIPO PÍLDORA (SECCIONES DE LA RESPUESTA) */}
             <div className="flex flex-wrap gap-2.5 border-b border-gray-100 bg-white px-8 py-4">
               {['todas', ...agruparPorSeccion(resultadoSeleccionado).map((g) => g.seccion)].map(
                 (seccion) => {
