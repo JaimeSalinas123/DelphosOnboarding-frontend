@@ -14,6 +14,9 @@ import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
 import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+
 const RESULTADOS_POR_PAGINA = 10;
 
 const FORM_VACIO: DatosPregunta = {
@@ -98,6 +101,9 @@ export default function EncuestasPage() {
   const [resultadoSeleccionado, setResultadoSeleccionado] = useState<ResultadoEncuesta | null>(null);
   const [seccionDetalle, setSeccionDetalle] = useState('todas');
 
+  const [descargandoGeneral, setDescargandoGeneral] = useState(false);
+  const [descargandoUsuario, setDescargandoUsuario] = useState(false);
+
   const [departamentoResultados, setDepartamentoResultados] = useState('');
   const [fechaDesdeResultados, setFechaDesdeResultados] = useState('');
   const [fechaHastaResultados, setFechaHastaResultados] = useState('');
@@ -131,11 +137,10 @@ export default function EncuestasPage() {
     };
 
     fetchPreguntas(false);
-    const intId = setInterval(() => fetchPreguntas(true), 10000); // Actualiza cada 10 seg
+    const intId = setInterval(() => fetchPreguntas(true), 10000); 
     return () => { cancelado = true; clearInterval(intId); };
   }, []);
 
-  // Carga de resultados con Polling Silencioso
   useEffect(() => {
     if (vista !== 'resultados') return;
     let cancelado = false;
@@ -163,7 +168,7 @@ export default function EncuestasPage() {
     };
 
     fetchResultados(false);
-    const intId = setInterval(() => fetchResultados(true), 10000); // Actualiza cada 10 seg
+    const intId = setInterval(() => fetchResultados(true), 10000); 
     return () => { cancelado = true; clearInterval(intId); };
   }, [
     vista,
@@ -254,7 +259,6 @@ export default function EncuestasPage() {
         await encuestaService.crear(formulario);
       }
       setModalAbierto(false);
-      // Forzamos una actualización inmediata al guardar
       const data = await encuestaService.listar();
       setPreguntas(data);
     } catch (err) {
@@ -282,6 +286,156 @@ export default function EncuestasPage() {
     }
   };
 
+  // ==========================================
+  // FUNCIÓN: GENERAR EXCEL GENERAL DE ENCUESTAS
+  // ==========================================
+  const generarExcelGeneral = async () => {
+    try {
+      setDescargandoGeneral(true);
+      
+      const todosLosResultados = await encuestaService.obtenerTodosLosResultados();
+      
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Encuestas Completadas', { views: [{ showGridLines: false }] });
+
+      sheet.columns = [
+        { header: '', key: 'nombre', width: 35 },
+        { header: '', key: 'email', width: 40 },
+        { header: '', key: 'departamento', width: 25 },
+        { header: '', key: 'fecha', width: 25 },
+        { header: '', key: 'total_preg', width: 20 }
+      ];
+
+      const titleRow = sheet.addRow([`REPORTE GENERAL DE ENCUESTAS DE SATISFACCIÓN`]);
+      sheet.mergeCells('A1:E1');
+      titleRow.height = 35;
+      titleRow.getCell(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFD85A30' } };
+      titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const subTitle = sheet.addRow([`Generado el: ${new Date().toLocaleDateString()}`]);
+      sheet.mergeCells('A2:E2');
+      subTitle.getCell(1).font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF6B7280' } };
+      subTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      sheet.addRow([]);
+
+      const headerRow = sheet.addRow(['Colaborador', 'Correo Electrónico', 'Departamento', 'Fecha de Envío', 'Respuestas Registradas']);
+      headerRow.height = 25;
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD85A30' } };
+        cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      });
+
+      let rowCounter = 0;
+      todosLosResultados.forEach(r => {
+        rowCounter++;
+        const isPar = rowCounter % 2 === 0;
+        const fechaStr = formatoFecha.format(new Date(r.fecha_completado));
+
+        const row = sheet.addRow([r.usuario.nombre, r.usuario.email, r.usuario.departamento || 'Sin asignar', fechaStr, r.respuestas.length]);
+        row.eachCell((cell, colNum) => {
+          cell.font = { name: 'Calibri', size: 11, color: { argb: 'FF374151' } };
+          cell.alignment = { vertical: 'middle', horizontal: colNum >= 5 ? 'center' : 'left' };
+          cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+          if (isPar) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Reporte_General_Encuestas_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    } catch (error) {
+      console.error(error);
+      setAlertModal('No se pudo generar el Excel general.');
+    } finally {
+      setDescargandoGeneral(false);
+    }
+  };
+
+  // ==========================================
+  // FUNCIÓN: GENERAR EXCEL ESPECÍFICO (USUARIO)
+  // ==========================================
+  const generarExcelUsuario = async (resultado: ResultadoEncuesta) => {
+    try {
+      setDescargandoUsuario(true);
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet(`Encuesta_${resultado.usuario.nombre.split(' ')[0]}`, {
+        views: [{ showGridLines: false }]
+      });
+
+      sheet.columns = [
+        { header: '', key: 'seccion', width: 30 }, 
+        { header: '', key: 'pregunta', width: 60 }, 
+        { header: '', key: 'tipo', width: 25 }, 
+        { header: '', key: 'respuesta', width: 35 }, 
+      ];
+
+      const titleRow = sheet.addRow([`ENCUESTA DE SATISFACCIÓN: ${resultado.usuario.nombre.toUpperCase()}`]);
+      sheet.mergeCells('A1:D1');
+      titleRow.height = 35;
+      titleRow.getCell(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFD85A30' } };
+      titleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const subTitle = sheet.addRow([`${resultado.usuario.departamento || 'Sin departamento'} | Enviado: ${formatoFecha.format(new Date(resultado.fecha_completado))}`]);
+      sheet.mergeCells('A2:D2');
+      subTitle.getCell(1).font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF6B7280' } };
+      subTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      sheet.addRow([]);
+
+      const grupos = agruparPorSeccion(resultado);
+
+      grupos.forEach((grupo) => {
+        const headerGrupo = sheet.addRow([`SECCIÓN: ${grupo.seccion.toUpperCase()}`]);
+        sheet.mergeCells(`A${headerGrupo.number}:D${headerGrupo.number}`);
+        headerGrupo.height = 25;
+        headerGrupo.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+        headerGrupo.getCell(1).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        headerGrupo.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        const headerTabla = sheet.addRow(['Sección', 'Pregunta Evaluada', 'Tipo', 'Respuesta Brindada']);
+        headerTabla.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD85A30' } };
+          cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        });
+
+        grupo.respuestas.forEach((resp, i) => {
+          // CORRECCIÓN APLICADA AQUÍ: bypass de TS usando as any
+          const escalaMax = (resp.pregunta as any).escala_max ?? 5;
+          const valor = resp.pregunta.tipo_respuesta === 'texto' 
+            ? resp.respuesta_texto || 'Sin respuesta' 
+            : `${resp.respuesta_numerica} / ${escalaMax}`;
+            
+          const filaData = sheet.addRow([
+            resp.pregunta.seccion,
+            resp.pregunta.pregunta, 
+            resp.pregunta.tipo_respuesta === 'escala' ? 'Escala Numérica' : 'Texto Libre',
+            valor
+          ]);
+          
+          const isPar = i % 2 === 0;
+          filaData.eachCell((cell, colNumber) => {
+            cell.font = { name: 'Calibri', size: 11, color: { argb: colNumber === 4 && resp.pregunta.tipo_respuesta === 'escala' ? 'FF16A34A' : 'FF374151' }, bold: colNumber === 4 };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber === 4 && resp.pregunta.tipo_respuesta === 'escala' ? 'center' : 'left', wrapText: true };
+            cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+            if (isPar) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+          });
+        });
+        sheet.addRow([]); 
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const fechaArchivo = new Date().toISOString().split('T')[0];
+      saveAs(blob, `Encuesta_${resultado.usuario.nombre.replace(/\s+/g, '_')}_${fechaArchivo}.xlsx`);
+
+    } catch (error) {
+      console.error(error);
+      setAlertModal('No se pudo generar el reporte de la encuesta del usuario.');
+    } finally {
+      setDescargandoUsuario(false);
   const abrirModalCodigo = () => {
     setModalCodigoAbierto(true);
     setErrorCodigo(null);
@@ -315,6 +469,7 @@ export default function EncuestasPage() {
 
   const esErrorSesionPreguntas = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
   const esErrorSesionResultados = errorResultados?.toLowerCase().includes('token') || errorResultados?.toLowerCase().includes('expirad');
+  const sesionExpirada = esErrorSesionPreguntas || esErrorSesionResultados;
 
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
@@ -333,6 +488,8 @@ export default function EncuestasPage() {
           </p>
         </div>
 
+        {!sesionExpirada && (
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center shrink-0">
           <button
             onClick={abrirModalCodigo}
@@ -370,10 +527,15 @@ export default function EncuestasPage() {
               Resultados
             </button>
           </div>
+        )}
         </div>
       </header>
 
-      {vista === 'preguntas' ? (
+      {sesionExpirada ? (
+        <div className="py-24 flex justify-center rounded-3xl bg-white shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+          <SessionExpired />
+        </div>
+      ) : vista === 'preguntas' ? (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <Eyebrow>Diseño del Formulario</Eyebrow>
@@ -413,18 +575,14 @@ export default function EncuestasPage() {
               <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando preguntas...</p>
             </div>
           ) : error ? (
-            esErrorSesionPreguntas ? (
-              <div className="py-12 flex justify-center"><SessionExpired /></div>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-                <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                </div>
-                <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
-                <p className="max-w-sm text-sm text-gray-500">{error}</p>
-                <button onClick={() => setCargando(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
-            )
+              <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
+              <p className="max-w-sm text-sm text-gray-500">{error}</p>
+              <button onClick={() => setCargando(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+            </div>
           ) : preguntasFiltradas.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
               <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
@@ -480,7 +638,32 @@ export default function EncuestasPage() {
         </section>
       ) : (
         <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
-          <Eyebrow>Registro de Evaluaciones</Eyebrow>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <Eyebrow>Registro de Evaluaciones</Eyebrow>
+
+            {!cargandoResultados && !errorResultados && resultados.length > 0 && (
+              <button
+                onClick={generarExcelGeneral}
+                disabled={descargandoGeneral}
+                className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
+              >
+                {descargandoGeneral ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                    Generando...
+                  </div>
+                ) : (
+                  <>
+                    <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Descargar Reporte General
+                  </>
+                )}
+              </button>
+            )}
+          </div>
 
           <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
             <SelectorDepartamento
@@ -528,23 +711,19 @@ export default function EncuestasPage() {
               <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando respuestas...</p>
             </div>
           ) : errorResultados ? (
-            esErrorSesionResultados ? (
-              <div className="py-12 flex justify-center"><SessionExpired /></div>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-                <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                </div>
-                <p className="text-base font-bold text-gray-900">Error al cargar resultados</p>
-                <p className="max-w-sm text-sm text-gray-500">{errorResultados}</p>
-                <button
-                  onClick={() => setIntentosResultados((n) => n + 1)}
-                  className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md"
-                >
-                  Reintentar
-                </button>
+            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+              <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
-            )
+              <p className="text-base font-bold text-gray-900">Error al cargar resultados</p>
+              <p className="max-w-sm text-sm text-gray-500">{errorResultados}</p>
+              <button
+                onClick={() => setIntentosResultados((n) => n + 1)}
+                className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md"
+              >
+                Reintentar
+              </button>
+            </div>
           ) : resultados.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
               <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
@@ -746,6 +925,33 @@ export default function EncuestasPage() {
         </div>
       )}
 
+      {!sesionExpirada && (
+        <ModalTarjeta
+          isOpen={!!preguntaAEliminar}
+          onClose={() => setPreguntaAEliminar(null)}
+          onConfirm={ejecutarEliminacion}
+          titulo={preguntaAEliminar ? `¿Eliminar la pregunta "${preguntaAEliminar.pregunta}"?` : '¿Eliminar pregunta?'}
+          descripcion="Quedará oculta, no se borra del historial."
+          textoConfirmar="Eliminar"
+          textoCancelar="Cancelar"
+          cargando={eliminandoPregunta}
+          esDestructivo={true}
+        />
+      )}
+
+      {!sesionExpirada && (
+        <ModalTarjeta
+          isOpen={!!alertModal}
+          onClose={() => setAlertModal(null)}
+          onConfirm={() => setAlertModal(null)}
+          titulo="Error"
+          descripcion={alertModal ?? ''}
+          textoConfirmar="Aceptar"
+          textoCancelar="Cerrar"
+        />
+      )}
+
+      {!sesionExpirada && resultadoSeleccionado && (
       <ModalTarjeta
         isOpen={!!preguntaAEliminar}
         onClose={() => setPreguntaAEliminar(null)}
@@ -846,22 +1052,43 @@ export default function EncuestasPage() {
                 <p className="text-sm font-medium text-gray-500 mb-2">{resultadoSeleccionado.usuario.email}</p>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600">
-                    {resultadoSeleccionado.usuario.departamento}
+                    {resultadoSeleccionado.usuario.departamento || 'Sin departamento'}
                   </span>
                   <span className="text-xs font-medium text-gray-400">
                     Enviado el {formatoFecha.format(new Date(resultadoSeleccionado.fecha_completado))}
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => setResultadoSeleccionado(null)}
-                className="rounded-full p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                aria-label="Cerrar"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => generarExcelUsuario(resultadoSeleccionado)}
+                  disabled={descargandoUsuario}
+                  className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-4 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
+                >
+                  {descargandoUsuario ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                      Generando...
+                    </div>
+                  ) : (
+                    <>
+                      <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                      Descargar Respuestas
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setResultadoSeleccionado(null)}
+                  className="rounded-full p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2.5 border-b border-gray-100 bg-white px-8 py-4">

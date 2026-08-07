@@ -15,7 +15,6 @@ import {
   YAxis,
   BarChart,
   Bar,
-  LabelList,
 } from 'recharts';
 import { usuarioService, type UsuarioListado } from '@/services/usuarioService';
 import {
@@ -26,6 +25,10 @@ import {
 import { estudioService, type ResultadoEstudio } from '@/services/estudioService';
 
 import SessionExpired from '@/components/global/SessionExpired';
+
+// IMPORTAMOS LIBRERÍAS DE EXCEL
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 // ============================================================================
 // CONFIGURACIÓN Y CONSTANTES
@@ -119,9 +122,12 @@ export default function DashboardCH() {
   const [resultadosEstudio, setResultadosEstudio] = useState<ResultadoEstudio[]>([]);
   const [preguntas, setPreguntas] = useState<PreguntaSatisfaccion[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [descargando, setDescargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intentos, setIntentos] = useState(0);
+  
   const [seccionActiva, setSeccionActiva] = useState<string | null>(null);
+  const [metodoActivo, setMetodoActivo] = useState<string | null>(null);
 
   // Polling silencioso
   useEffect(() => {
@@ -151,74 +157,125 @@ export default function DashboardCH() {
     };
 
     cargarDatos(false);
-    const intId = setInterval(() => cargarDatos(true), 10000); // Actualización en tiempo real (10s)
+    const intId = setInterval(() => cargarDatos(true), 10000); 
     return () => { cancelado = true; clearInterval(intId); };
   }, [intentos]);
 
   // ==========================================
-  // CÁLCULOS ESTUDIOS
+  // CÁLCULOS ESTUDIOS 
   // ==========================================
-  const metricasEstudio = useMemo(() => {
-    let cuestionarioScore = 0;
-    let cuestionarioMax = 0;
-    let cuestionarioCount = 0;
+  const desempeñoPorMetodo = useMemo(() => {
+    const methodMap: Record<string, string> = {
+      'cuestionario': 'Cuestionarios',
+      'verdadero_falso': 'Verdadero / Falso',
+      'flashcard': 'Flashcards'
+    };
 
-    let vfScore = 0;
-    let vfMax = 0;
-    let vfCount = 0;
+    const stats: Record<string, any> = {
+      'Cuestionarios': { totalScore: 0, totalMax: 0, count: 0, preguntas: {} },
+      'Verdadero / Falso': { totalScore: 0, totalMax: 0, count: 0, preguntas: {} },
+      'Flashcards': { totalVistas: 0, sesiones: 0 },
+    };
 
-    let flashcardCount = 0;
-    let flashcardsVistas = 0;
+    resultadosEstudio.forEach(r => {
+      const seccion = methodMap[r.metodo];
+      if (!seccion) return;
 
-    resultadosEstudio.forEach((r) => {
-      if (r.metodo === 'cuestionario') {
-        cuestionarioCount++;
+      if (r.metodo === 'flashcard') {
+        stats['Flashcards'].totalVistas += (r.total_preguntas || 0);
+        stats['Flashcards'].sesiones += 1;
+      } else {
         if (r.puntuacion != null && r.total_preguntas) {
-          cuestionarioScore += r.puntuacion;
-          cuestionarioMax += r.total_preguntas;
+          stats[seccion].totalScore += r.puntuacion;
+          stats[seccion].totalMax += r.total_preguntas;
+          stats[seccion].count++;
         }
-      } else if (r.metodo === 'verdadero_falso') {
-        vfCount++;
-        if (r.puntuacion != null && r.total_preguntas) {
-          vfScore += r.puntuacion;
-          vfMax += r.total_preguntas;
-        }
-      } else if (r.metodo === 'flashcard') {
-        flashcardCount++;
-        if (r.total_preguntas) {
-          flashcardsVistas += r.total_preguntas;
+
+        if (r.respuestas_detalle && Array.isArray(r.respuestas_detalle)) {
+          r.respuestas_detalle.forEach((detalle: any) => {
+            const p = detalle.pregunta || 'Pregunta sin registrar';
+            if (!stats[seccion].preguntas[p]) {
+              stats[seccion].preguntas[p] = { correctas: 0, incorrectas: 0, total: 0 };
+            }
+            stats[seccion].preguntas[p].total++;
+            if (detalle.es_correcta) {
+              stats[seccion].preguntas[p].correctas++;
+            } else {
+              stats[seccion].preguntas[p].incorrectas++;
+            }
+          });
         }
       }
     });
 
-    const promedioCuestionario = cuestionarioMax > 0 ? Math.round((cuestionarioScore / cuestionarioMax) * 100) : 0;
-    const promedioVF = vfMax > 0 ? Math.round((vfScore / vfMax) * 100) : 0;
-    
-    const datosGrafica = [
-      { metodo: 'Cuestionarios', promedio: promedioCuestionario, sesiones: cuestionarioCount, fill: '#f97316' },
-      { metodo: 'Verdadero / Falso', promedio: promedioVF, sesiones: vfCount, fill: '#1f2937' }
-    ];
+    const resultadoFinal = [];
 
-    return {
-      datosGrafica,
-      flashcardCount,
-      flashcardsVistas,
-    };
+    ['Cuestionarios', 'Verdadero / Falso'].forEach(sec => {
+      const data = stats[sec];
+      if (data.count > 0 || Object.keys(data.preguntas).length > 0) {
+        
+        const items = Object.entries(data.preguntas).map(([pregunta, d]: [string, any]) => {
+          const pctAcierto = d.total > 0 ? Math.round((d.correctas / d.total) * 100) : 0;
+          const pctFallo = d.total > 0 ? Math.round((d.incorrectas / d.total) * 100) : 0;
+          
+          return {
+            etiqueta: pregunta,
+            pct: pctAcierto,
+            pctFallo: pctFallo,
+            textoDerecha: '', 
+            textoAciertos: `${d.correctas} aciertos`,
+            textoFallos: `${d.incorrectas} fallos`,
+            isFlashcard: false
+          };
+        }).sort((a, b) => a.pct - b.pct);
+
+        const promedioSeccion = data.totalMax > 0 ? Math.round((data.totalScore / data.totalMax) * 100) : 0;
+
+        resultadoFinal.push({
+          seccion: sec,
+          promedioSeccion,
+          items
+        });
+      }
+    });
+
+    if (stats['Flashcards'].sesiones > 0) {
+      resultadoFinal.push({
+        seccion: 'Flashcards',
+        promedioSeccion: stats['Flashcards'].totalVistas,
+        items: [
+          {
+            etiqueta: 'Tarjetas (Flashcards) repasadas en total',
+            pct: 100,
+            pctFallo: 0,
+            textoDerecha: `${stats['Flashcards'].totalVistas} tarjetas`,
+            textoAciertos: '', 
+            textoFallos: '',   
+            isFlashcard: true
+          },
+          {
+            etiqueta: 'Sesiones de práctica libre completadas',
+            pct: 100,
+            pctFallo: 0,
+            textoDerecha: `${stats['Flashcards'].sesiones} sesiones`,
+            textoAciertos: '', 
+            textoFallos: '',   
+            isFlashcard: true
+          }
+        ]
+      });
+    }
+
+    return resultadoFinal;
   }, [resultadosEstudio]);
 
-  const CustomTooltipEstudio = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white p-4 rounded-xl shadow-xl border border-gray-100">
-          <p className="font-bold text-gray-900 mb-1">{data.metodo}</p>
-          <p className="text-sm text-brand-orange font-bold">Promedio: {data.promedio}%</p>
-          <p className="text-xs text-gray-500 mt-1">{data.sesiones} sesiones completadas</p>
-        </div>
-      );
+  useEffect(() => {
+    if (desempeñoPorMetodo.length > 0 && !metodoActivo) {
+      setMetodoActivo(desempeñoPorMetodo[0].seccion);
     }
-    return null;
-  };
+  }, [desempeñoPorMetodo, metodoActivo]);
+
+  const metodoActual = desempeñoPorMetodo.find(m => m.seccion === metodoActivo);
 
   // ==========================================
   // CÁLCULOS ENCUESTAS Y USUARIOS
@@ -307,8 +364,174 @@ export default function DashboardCH() {
   const tasaFinalizacion =
     usuarios.length > 0 ? Math.min(100, Math.round((resultadosEncuestas.length / usuarios.length) * 100)) : 0;
 
-  const grupoActivo = promedioPorSeccion.find((g) => g.seccion === seccionActiva);
+  // ==========================================
+  // FUNCIÓN PARA GENERAR UN EXCEL NATIVO Y ELEGANTE (.xlsx)
+  // ==========================================
+  const generarExcel = async () => {
+    try {
+      setDescargando(true);
+      const workbook = new ExcelJS.Workbook();
+      
+      // Creamos la hoja ocultando la cuadrícula gris fea de Excel
+      const sheet = workbook.addWorksheet('Métricas Delphos', {
+        views: [{ showGridLines: false }] 
+      });
 
+      // Definimos anchos de columna mucho más grandes para que quepan las preguntas
+      sheet.columns = [
+        { header: '', key: 'col1', width: 45 },
+        { header: '', key: 'col2', width: 60 },
+        { header: '', key: 'col3', width: 20 },
+        { header: '', key: 'col4', width: 20 }
+      ];
+
+      // ESTILOS PREMIUM
+      const colorNaranja = 'FFD85A30'; // Naranja corporativo
+      const colorOscuro = 'FF1F2937';  // Gris oscuro (Casi negro)
+      const borderConfig: Partial<ExcelJS.Borders> = {
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      };
+
+      // Función auxiliar para crear títulos de sección bonitos
+      const crearTituloSeccion = (titulo: string) => {
+        sheet.addRow([]); // Espacio antes
+        const row = sheet.addRow([titulo]);
+        sheet.mergeCells(`A${row.number}:D${row.number}`);
+        row.height = 30;
+        row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorOscuro } };
+        row.getCell(1).font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+        row.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        sheet.addRow([]); // Espacio después
+      };
+
+      // Función auxiliar para crear cabeceras de tabla
+      const crearCabeceraTabla = (headers: string[]) => {
+        const row = sheet.addRow(headers);
+        row.height = 25;
+        row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+          if(colNumber <= headers.length) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colorNaranja } };
+            cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber > 2 ? 'center' : 'left', wrapText: true };
+          }
+        });
+      };
+
+      // Función auxiliar para pintar filas de datos con efecto "Zebra" (colores alternos)
+      let rowCounter = 0;
+      const agregarFilaDato = (datos: any[], alignDerechaCenter = true) => {
+        rowCounter++;
+        const row = sheet.addRow(datos);
+        const isPar = rowCounter % 2 === 0;
+        
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if (colNumber <= 4) {
+            cell.font = { name: 'Calibri', size: 11, color: { argb: colNumber > 2 ? 'FF111827' : 'FF4B5563' }, bold: colNumber > 2 };
+            cell.alignment = { 
+              vertical: 'middle', 
+              horizontal: (colNumber > 2 && alignDerechaCenter) ? 'center' : 'left', 
+              wrapText: true 
+            };
+            cell.border = borderConfig;
+            
+            // Efecto zebra súper sutil
+            if (isPar) {
+              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+            }
+          }
+        });
+      };
+
+      // ----------------------------------------------------
+      // INICIA EL PINTADO DEL DOCUMENTO
+      // ----------------------------------------------------
+
+      // Título principal gigante
+      const mainTitle = sheet.addRow(['REPORTE DE MÉTRICAS - CAPITAL HUMANO']);
+      sheet.mergeCells('A1:D1');
+      mainTitle.height = 40;
+      mainTitle.getCell(1).font = { name: 'Calibri', size: 18, bold: true, color: { argb: colorNaranja } };
+      mainTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+      
+      const subTitle = sheet.addRow([`Generado el: ${new Date().toLocaleDateString()}`]);
+      sheet.mergeCells('A2:D2');
+      subTitle.getCell(1).font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF6B7280' } };
+      subTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      // 1. RESUMEN GLOBAL
+      crearTituloSeccion('1. RESUMEN GLOBAL DE LA PLATAFORMA');
+      crearCabeceraTabla(['Métrica', 'Valor Alcanzado']);
+      
+      rowCounter = 0; // Reiniciar zebra
+      agregarFilaDato(['Total de Usuarios Activos', usuarios.length]);
+      agregarFilaDato(['Encuestas Completadas', resultadosEncuestas.length]);
+      agregarFilaDato(['Satisfacción Global', `${indiceSatisfaccion ?? 0}%`]);
+      agregarFilaDato(['Tasa de Finalización de Onboarding', `${tasaFinalizacion}%`]);
+
+      // 2. DEPARTAMENTOS Y ROLES
+      crearTituloSeccion('2. DISTRIBUCIÓN DEL PERSONAL');
+      crearCabeceraTabla(['Departamento', 'Cantidad de Usuarios', 'Rol', 'Cantidad']);
+      
+      rowCounter = 0;
+      // Emparejar los dos arreglos en la misma tabla visual para ahorrar espacio
+      const maxRows = Math.max(porDepartamento.length, porRol.length);
+      for (let i = 0; i < maxRows; i++) {
+        const dep = porDepartamento[i] ? porDepartamento[i].nombre : '';
+        const depVal = porDepartamento[i] ? porDepartamento[i].valor : '';
+        const rol = porRol[i] ? porRol[i].nombre : '';
+        const rolVal = porRol[i] ? porRol[i].valor : '';
+        agregarFilaDato([dep, depVal, rol, rolVal], false); // Falso para no centrar todo
+      }
+
+      // 3. DESEMPEÑO EN APRENDIZAJE
+      crearTituloSeccion('3. DESEMPEÑO EN MÓDULOS DE ESTUDIO (GRC)');
+      crearCabeceraTabla(['Categoría Evaluada', 'Pregunta / Concepto', 'Aciertos / Vistas', 'Fallos / Sesiones']);
+      
+      rowCounter = 0;
+      desempeñoPorMetodo.forEach(m => {
+        m.items.forEach(item => {
+          if (item.isFlashcard) {
+            agregarFilaDato([m.seccion, item.etiqueta, item.textoDerecha, 'N/A']);
+          } else {
+            agregarFilaDato([m.seccion, item.etiqueta, item.textoAciertos, item.textoFallos]);
+          }
+        });
+      });
+
+      // 4. SATISFACCIÓN DETALLADA
+      crearTituloSeccion('4. RESULTADOS DE SATISFACCIÓN (ENCUESTAS)');
+      crearCabeceraTabla(['Área Evaluada', 'Pregunta Específica', 'Promedio Obtenido', 'Puntaje Máximo']);
+      
+      rowCounter = 0;
+      promedioPorSeccion.forEach(s => {
+        s.preguntas.forEach(p => {
+          agregarFilaDato([s.seccion, p.pregunta, parseFloat(p.promedio.toFixed(2)), p.max]);
+        });
+      });
+
+      // 5. TRÁFICO
+      crearTituloSeccion('5. TRÁFICO DE EVALUACIONES POR DÍA');
+      crearCabeceraTabla(['Fecha de Evaluación', 'Encuestas Completadas']);
+      rowCounter = 0;
+      completadasPorDia.forEach(d => {
+        agregarFilaDato([d.fecha, d.valor]);
+      });
+
+      // Descargar el archivo procesado
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const fechaArchivo = new Date().toISOString().split('T')[0];
+      saveAs(blob, `Reporte_Metricas_Delphos_${fechaArchivo}.xlsx`);
+
+    } catch (err) {
+      console.error('Error generando Excel:', err);
+      setError('No se pudo generar el archivo Excel.');
+    } finally {
+      setDescargando(false);
+    }
+  };
+
+  const grupoActivo = promedioPorSeccion.find((g) => g.seccion === seccionActiva);
   const esErrorSesion = error?.toLowerCase().includes('token') || error?.toLowerCase().includes('expirad');
 
   if (!user) return null;
@@ -327,9 +550,36 @@ export default function DashboardCH() {
         </p>
       </header>
 
+      {/* TARJETA OSCURA DE ADMINISTRADOR */}
       <section className="mb-10 overflow-hidden rounded-2xl bg-gradient-to-r from-gray-900 to-gray-800 p-8 shadow-xl relative text-white">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl pointer-events-none" />
         
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-gray-700">
+          <h2 className="text-lg font-bold text-white tracking-wide">Perfil del Administrador</h2>
+          
+          {/* BOTÓN DE DESCARGAR EXCEL PREMIUM */}
+          <button
+            onClick={generarExcel}
+            disabled={cargando || !!error || descargando}
+            className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50 disabled:pointer-events-none"
+            title="Descargar reporte estructurado en Excel"
+          >
+            {descargando ? (
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                Generando Excel...
+              </div>
+            ) : (
+              <>
+                <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Descargar como Excel
+              </>
+            )}
+          </button>
+        </div>
+
         <div className="relative z-10 grid grid-cols-1 gap-6 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-700">
           <div className="sm:pr-6">
             <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Usuario Activo</p>
@@ -429,78 +679,103 @@ export default function DashboardCH() {
             </div>
 
             {/* =======================================================
-                RESULTADOS DE ESTUDIO (GRÁFICA HORIZONTAL CORREGIDA)
+                DESEMPEÑO EN APRENDIZAJE: ANÁLISIS DE ACIERTOS Y FALLOS
                 ======================================================= */}
             <div className="rounded-3xl bg-white p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-wider text-gray-900">Desempeño en Aprendizaje</h3>
-                  <p className="mt-1 text-sm text-gray-500">Métricas globales de asimilación de conocimiento.</p>
+                  <p className="mt-1 text-sm text-gray-500">Tasa de acierto y error por pregunta para identificar áreas de refuerzo.</p>
                 </div>
               </div>
 
-              {resultadosEstudio.length === 0 ? (
+              {desempeñoPorMetodo.length === 0 ? (
                 <div className="py-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                   <p className="text-sm font-medium text-gray-500">Aún no hay datos de estudio suficientes para generar el reporte.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                  
-                  {/* Gráfica de Barras Horizontales */}
-                  <div className="lg:col-span-2 rounded-2xl border border-gray-100 bg-gray-50/50 p-6 flex flex-col justify-center">
-                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-6">Promedios de Evaluación Global</h4>
-                    <div className="h-[200px] w-full pr-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart 
-                          data={metricasEstudio.datosGrafica} 
-                          layout="vertical" 
-                          margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
-                          barSize={32}
+                <div>
+                  {/* Selector de Pestañas (Métodos) */}
+                  <div className="flex flex-wrap gap-2.5 pb-6">
+                    {desempeñoPorMetodo.map((grupo) => {
+                      const isActive = metodoActivo === grupo.seccion;
+                      return (
+                        <button
+                          key={grupo.seccion}
+                          onClick={() => setMetodoActivo(grupo.seccion)}
+                          className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-out ${
+                            isActive
+                              ? 'bg-gray-900 text-white shadow-md shadow-gray-900/20 scale-105'
+                              : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
+                          }`}
                         >
-                          <XAxis type="number" domain={[0, 100]} hide />
-                          <YAxis 
-                            dataKey="metodo" 
-                            type="category" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fill: '#4b5563', fontSize: 13, fontWeight: 700 }} 
-                            width={140} 
-                          />
-                          <Tooltip cursor={{ fill: '#f3f4f6' }} content={<CustomTooltipEstudio />} />
-                          <Bar dataKey="promedio" radius={[0, 8, 8, 0]}>
-                            {
-                              metricasEstudio.datosGrafica.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))
-                            }
-                            {/* CORRECCIÓN APLICADA AQUÍ: val as any */}
-                            <LabelList 
-                              dataKey="promedio" 
-                              position="right" 
-                              formatter={(val: any) => `${val}%`} 
-                              fill="#111827" 
-                              fontSize={15} 
-                              fontWeight={800} 
-                            />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
+                          {grupo.seccion}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Contenedor de Barras */}
+                  {metodoActual && (
+                    <div className="mt-6 rounded-xl bg-white p-6 border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
+                        <h4 className="text-lg font-bold text-gray-900">
+                          {metodoActual.seccion}
+                        </h4>
+                        <div className="flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mr-2">
+                            {metodoActual.seccion === 'Flashcards' ? 'Total Vistas' : 'Acierto Global'}
+                          </span>
+                          <span className="text-sm font-bold text-[#d85a30]">
+                            {metodoActual.promedioSeccion}{metodoActual.seccion === 'Flashcards' ? '' : '%'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        {metodoActual.items.length === 0 ? (
+                           <p className="text-sm text-gray-500 italic">No hay desglose de preguntas registrado para este método.</p>
+                        ) : (
+                          metodoActual.items.map((item, idx) => (
+                            <div key={idx}>
+                              <div className="flex justify-between items-end mb-2">
+                                <p className="text-sm font-medium text-gray-700 max-w-[65%] leading-snug">{item.etiqueta}</p>
+                                <span className={`text-sm font-bold`}>
+                                  {item.isFlashcard ? (
+                                    <span className="text-gray-900"></span>
+                                  ) : (
+                                    <>
+                                      <span className="text-[#d85a30]">{item.pct}% aciertan</span> 
+                                      <span className="text-[#1f2937] ml-2">| {item.pctFallo}% fallan</span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className={`h-2.5 flex-1 overflow-hidden rounded-full ${item.isFlashcard ? 'bg-gray-200' : 'bg-[#1f2937]'}`}>
+                                  <div
+                                    className={`h-full transition-all duration-500 ${item.isFlashcard ? 'bg-[#1f2937] rounded-full' : 'bg-[#d85a30]'}`}
+                                    style={{ width: `${item.pct}%` }}
+                                  />
+                                </div>
+                                <span className="w-40 shrink-0 text-right text-[10px] uppercase font-bold tracking-wider">
+                                  {item.isFlashcard ? (
+                                    <span className="text-gray-400">{item.textoDerecha}</span>
+                                  ) : (
+                                    <div className="flex justify-end items-center gap-1.5">
+                                      <span className="text-[#d85a30]">{item.textoAciertos}</span>
+                                      <span className="text-gray-300">|</span>
+                                      <span className="text-[#1f2937]">{item.textoFallos}</span>
+                                    </div>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                     <div className="flex-1 rounded-2xl border border-brand-orange/20 bg-brand-orange/5 p-6 shadow-sm flex flex-col justify-center text-center transition-all hover:bg-brand-orange/10">
-                         <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange mb-2">Práctica Activa</span>
-                         <span className="text-4xl font-black text-brand-orange">{metricasEstudio.flashcardsVistas}</span>
-                         <span className="text-xs font-semibold text-gray-600 mt-1">Tarjetas (Flashcards) repasadas</span>
-                     </div>
-                     <div className="flex-1 rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-sm flex flex-col justify-center text-center transition-all hover:bg-gray-800">
-                         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Sesiones de Repaso</span>
-                         <span className="text-4xl font-black text-white">{metricasEstudio.flashcardCount}</span>
-                         <span className="text-xs font-semibold text-gray-400 mt-1">Prácticas libres completadas</span>
-                     </div>
-                  </div>
-
+                  )}
                 </div>
               )}
             </div>
