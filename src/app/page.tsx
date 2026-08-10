@@ -1,6 +1,12 @@
 import Image from "next/image";
+import { redirect } from "next/navigation"; // <-- Agregado para la redirección
 
 export default function Home() {
+  // <-- Agregado: Redirecciona automáticamente a la página de login
+  // Si la ruta de tu login es distinta (ej. '/auth'), cámbiala aquí:
+  redirect('/login'); 
+
+  // Todo el código original que tenías se conserva abajo:
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
