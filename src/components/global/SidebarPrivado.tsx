@@ -72,6 +72,16 @@ const ENLACES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.829 1.58-2.083a4.501 4.501 0 10-7.66 0c.922.254 1.58 1.1 1.58 2.083v.192" />
       </svg>
     ),
+  },
+  {
+    href: '/dashboard-ch/auditoria',
+    label: 'Auditoría',
+    icono: (
+      <svg {...ICON_PROPS}>
+        {/* Ícono de portapapeles con escudo/checklist para auditoría */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+      </svg>
+    ),
   }
 ];
 
