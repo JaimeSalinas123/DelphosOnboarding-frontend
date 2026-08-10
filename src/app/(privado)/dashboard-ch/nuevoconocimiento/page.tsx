@@ -25,7 +25,6 @@ export default function NuevoConocimientoPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState('');
-  const [encabezadoTxt, setEncabezadoTxt] = useState('');
 
   // Estados para eliminación
   const [moduloAEliminar, setModuloAEliminar] = useState<ModuloIA | null>(null);
@@ -52,7 +51,7 @@ export default function NuevoConocimientoPage() {
     };
 
     cargarDocumentacion(false);
-    const intId = setInterval(() => cargarDocumentacion(true), 10000); // Recarga silenciosa cada 10s
+    const intId = setInterval(() => cargarDocumentacion(true), 10000); 
     
     return () => { 
       cancelado = true; 
@@ -61,44 +60,72 @@ export default function NuevoConocimientoPage() {
   }, []);
 
   const parsearTexto = (textoBruto: string) => {
-    // Buscar si hay texto de cabecera antes del primer separador ====
-    const primerMatchIndex = textoBruto.search(/={5,}/);
-    if (primerMatchIndex !== -1) {
-      setEncabezadoTxt(textoBruto.substring(0, primerMatchIndex));
-    } else {
-      setEncabezadoTxt(textoBruto);
+    if (!textoBruto || textoBruto.trim() === '') {
+      setModulos([]);
+      return;
     }
 
-    const regexSeccion = /={5,}\r?\n##\s*(.*?)\r?\n={5,}\r?\n([\s\S]*?)(?=\r?\n={5,}|$)/g;
-    let match;
+    // Cortamos el texto usando 10 o más signos de igual como divisores exactos
+    const partes = textoBruto.split(/={10,}/);
     const nuevosModulos: ModuloIA[] = [];
-    
-    while ((match = regexSeccion.exec(textoBruto)) !== null) {
-      nuevosModulos.push({
-        id: Math.random().toString(36).substring(2, 9),
-        titulo: match[1].trim(),
-        contenido: match[2].trim(),
-      });
+
+    for (let i = 0; i < partes.length; i++) {
+      const parteLimpia = partes[i].trim();
+      if (!parteLimpia) continue;
+
+      // -------------------------------------------------------------
+      // CASO 1: FORMATO ANTIGUO (FECHA: ... PREGUNTA NO DOCUMENTADA:)
+      // -------------------------------------------------------------
+      if (parteLimpia.includes('PREGUNTA NO DOCUMENTADA:')) {
+        const lineas = parteLimpia.split('\n').map(l => l.trim());
+        let fecha = 'Sin fecha';
+        let pregunta = 'Pregunta desconocida';
+
+        lineas.forEach(l => {
+          if (l.startsWith('FECHA:')) {
+            fecha = l.replace('FECHA:', '').trim();
+          } else if (l.startsWith('PREGUNTA NO DOCUMENTADA:')) {
+            pregunta = l.replace('PREGUNTA NO DOCUMENTADA:', '').trim();
+          }
+        });
+
+        nuevosModulos.push({
+          id: Math.random().toString(36).substring(2, 9),
+          titulo: pregunta,
+          contenido: `Fecha de captura: ${fecha}`
+        });
+      }
+      // -------------------------------------------------------------
+      // CASO 2: FORMATO NUEVO (El que tu backend actual genera con ##)
+      // -------------------------------------------------------------
+      else if (parteLimpia.startsWith('##')) {
+        const titulo = parteLimpia.substring(2).trim(); // Quita el "##"
+        const contenido = partes[i + 1] ? partes[i + 1].trim() : '';
+        
+        nuevosModulos.push({
+          id: Math.random().toString(36).substring(2, 9),
+          titulo,
+          contenido
+        });
+        
+        i++; // Saltamos la siguiente parte porque ya la usamos como contenido
+      }
     }
     
-    // Mostramos los registros más recientes en la parte superior
     setModulos(nuevosModulos.reverse());
   };
 
-  // Función para reescribir el archivo en el backend sin el módulo eliminado
   const ejecutarEliminacion = async () => {
     if (!moduloAEliminar) return;
     setEliminando(true);
     
     try {
       const actualizados = modulos.filter(m => m.id !== moduloAEliminar.id);
+      let textoFinal = '';
       
-      let textoFinal = encabezadoTxt;
-      if (textoFinal && !textoFinal.endsWith('\n\n')) textoFinal += '\n\n';
-      
-      // Como modulos está invertido para la vista, lo volvemos a invertir para guardarlo en orden original
       const modulosParaGuardar = [...actualizados].reverse();
 
+      // Al reescribir, sanamos el archivo al Formato Nuevo automáticamente
       modulosParaGuardar.forEach((mod) => {
         textoFinal += `===============================================================================\n`;
         textoFinal += `## ${mod.titulo}\n`;
