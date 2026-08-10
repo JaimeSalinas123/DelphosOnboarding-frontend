@@ -9,14 +9,17 @@ import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseFlashcard = 'inicio' | 'cargando' | 'estudio' | 'fin' | 'error';
 
+// Extendemos localmente el tipo para evitar el error de TypeScript
+type PreguntaExtendida = Pregunta & { explicacion?: string };
+
 export default function FlashcardsPage() {
   const [fase, setFase] = useState<FaseFlashcard>('inicio');
-  const [tarjetas, setTarjetas] = useState<Pregunta[]>([]);
+  const [tarjetas, setTarjetas] = useState<PreguntaExtendida[]>([]);
   const [indiceActual, setIndiceActual] = useState(0);
   
   const [isFlipped, setIsFlipped] = useState(false);
   const [respuestaEscrita, setRespuestaEscrita] = useState('');
-  const [historialRespuestas, setHistorialRespuestas] = useState<any[]>([]); // NUEVO: Acumula las respuestas
+  const [historialRespuestas, setHistorialRespuestas] = useState<any[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const iniciarFlashcards = async () => {
@@ -32,7 +35,7 @@ export default function FlashcardsPage() {
 
       const tarjetasMezcladas = dataFlashcards
         .sort(() => 0.5 - Math.random())
-        .slice(0, 10);
+        .slice(0, 10) as PreguntaExtendida[]; // Forzamos el tipo extendido aquí
       
       setTarjetas(tarjetasMezcladas);
       setIndiceActual(0);
@@ -60,7 +63,7 @@ export default function FlashcardsPage() {
       pregunta: tarjetaActual.pregunta,
       respuesta_usuario: respuestaEscrita || 'Sin responder',
       respuesta_correcta: tarjetaActual.respuesta_correcta,
-      es_correcta: true // Flashcards son de auto-repaso, las marcamos como correctas para evitar color rojo
+      es_correcta: true 
     };
     const nuevoHistorial = [...historialRespuestas, nuevoDetalle];
     setHistorialRespuestas(nuevoHistorial);
@@ -81,7 +84,7 @@ export default function FlashcardsPage() {
             metodo: 'flashcard',
             puntuacion: null, 
             total_preguntas: tarjetas.length,
-            respuestas_detalle: nuevoHistorial // LO ENVIAMOS AL BACKEND
+            respuestas_detalle: nuevoHistorial
           });
           useProgresoStore.getState().cargar();
         } catch (err) {
