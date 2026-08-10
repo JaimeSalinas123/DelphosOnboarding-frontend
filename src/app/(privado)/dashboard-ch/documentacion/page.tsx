@@ -6,16 +6,14 @@ import SessionExpired from '@/components/global/SessionExpired';
 import ModalTarjeta from '@/components/global/ModalTarjeta';
 
 interface ModuloIA {
-  id: string; // ID temporal solo para React
+  id: string; 
   titulo: string;
   contenido: string;
 }
 
-// Separadores exactos que usa tu TXT
 const SEPARADOR_LINEA = '===============================================================================';
 const PREFIJO_TITULO = '## ';
 
-// Texto de ejemplo genérico para descargar
 const TEXTO_EJEMPLO = `===============================================================================
 ## 1. NOMBRE DEL MÓDULO DE EJEMPLO
 ===============================================================================
@@ -49,7 +47,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 export default function DocumentacionPage() {
   const [modulos, setModulos] = useState<ModuloIA[]>([]);
-  const [encabezadoTxt, setEncabezadoTxt] = useState(''); // Lo que va antes del primer "## 1."
+  const [encabezadoTxt, setEncabezadoTxt] = useState(''); 
   
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -57,7 +55,6 @@ export default function DocumentacionPage() {
   
   const [busqueda, setBusqueda] = useState('');
   
-  // Modales
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [formulario, setFormulario] = useState({ titulo: '', contenido: '' });
@@ -66,12 +63,10 @@ export default function DocumentacionPage() {
   const [moduloAEliminar, setModuloAEliminar] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
-  // Subida de archivos
   const [modalSubidaAbierto, setModalSubidaAbierto] = useState(false);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. CARGAR Y PARSEAR EL ARCHIVO TXT
   const cargarDocumentacion = async () => {
     setCargando(true);
     setError(null);
@@ -90,18 +85,18 @@ export default function DocumentacionPage() {
   }, []);
 
   const parsearTexto = (textoBruto: string) => {
-    // Busca las secciones que están entre los separadores ======
-    const regexSeccion = /===============================================================================\n##\s(.*?)\n===============================================================================\n([\s\S]*?)(?=\n={79}|$)/g;
+    // Escáner Indestructible (Soporta \r\n de Windows y largos variables de "=")
+    const primerMatchIndex = textoBruto.search(/={5,}/);
+    if (primerMatchIndex !== -1) {
+      setEncabezadoTxt(textoBruto.substring(0, primerMatchIndex));
+    } else {
+      setEncabezadoTxt(textoBruto);
+    }
+
+    const regexSeccion = /={5,}\r?\n##\s*(.*?)\r?\n={5,}\r?\n([\s\S]*?)(?=\r?\n={5,}|$)/g;
     
     let match;
     const nuevosModulos: ModuloIA[] = [];
-    
-    // Extraer el encabezado inicial (Metadatos, Propósito, etc)
-    const primerMatch = regexSeccion.exec(textoBruto);
-    if (primerMatch) {
-      setEncabezadoTxt(textoBruto.substring(0, primerMatch.index));
-      regexSeccion.lastIndex = 0; // Reiniciar
-    }
 
     while ((match = regexSeccion.exec(textoBruto)) !== null) {
       nuevosModulos.push({
@@ -114,12 +109,10 @@ export default function DocumentacionPage() {
     setModulos(nuevosModulos);
   };
 
-  // 2. CONSTRUIR EL TXT Y GUARDAR
   const guardarEnBackend = async (modulosActualizados: ModuloIA[]) => {
     try {
-      // Reconstruimos el texto exacto
       let textoFinal = encabezadoTxt;
-      if (!textoFinal.endsWith('\n\n')) textoFinal += '\n\n';
+      if (textoFinal && !textoFinal.endsWith('\n\n')) textoFinal += '\n\n';
 
       modulosActualizados.forEach((mod) => {
         textoFinal += `${SEPARADOR_LINEA}\n`;
@@ -130,19 +123,18 @@ export default function DocumentacionPage() {
 
       await documentacionService.guardarTexto(textoFinal);
       setModulos(modulosActualizados);
-      return true; // Éxito
+      return true; 
     } catch (err: any) {
       setAlertModal(`Error al guardar: ${err.message}`);
-      return false; // Fallo
+      return false; 
     }
   };
 
-  // 3. ACCIONES DE LA INTERFAZ (Crear, Editar, Eliminar)
   const abrirCrear = () => {
     setEditandoId(null);
     setFormulario({ 
       titulo: `${modulos.length + 1}. NUEVO MÓDULO`, 
-      contenido: '' // Placeholder visible al enfocar
+      contenido: '' 
     });
     setModalAbierto(true);
   };
@@ -180,7 +172,7 @@ export default function DocumentacionPage() {
       exito = await guardarEnBackend(actualizados);
     } else {
       const nuevoModulo = { id: Math.random().toString(36).substring(2, 9), ...formulario };
-      const actualizados = [...modulos, nuevoModulo]; // Se agrega al final
+      const actualizados = [...modulos, nuevoModulo]; 
       exito = await guardarEnBackend(actualizados);
     }
     
@@ -190,7 +182,6 @@ export default function DocumentacionPage() {
     }
   };
 
-  // 4. DESCARGAR Y SUBIR ARCHIVOS (NUEVAS FUNCIONES)
   const descargarEjemplo = () => {
     const blob = new Blob([TEXTO_EJEMPLO], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -210,9 +201,7 @@ export default function DocumentacionPage() {
     setSubiendoArchivo(true);
     try {
       const textoImportado = await file.text();
-      
-      // Mismo regex para parsear el archivo importado
-      const regexSeccion = /===============================================================================\n##\s(.*?)\n===============================================================================\n([\s\S]*?)(?=\n={79}|$)/g;
+      const regexSeccion = /={5,}\r?\n##\s*(.*?)\r?\n={5,}\r?\n([\s\S]*?)(?=\r?\n={5,}|$)/g;
       
       let match;
       const nuevosModulosArchivo: ModuloIA[] = [];
@@ -228,7 +217,6 @@ export default function DocumentacionPage() {
       if (nuevosModulosArchivo.length === 0) {
         setAlertModal('No se detectó ningún módulo en el archivo. Asegúrate de usar exactamente los separadores (====) y el título (## ).');
       } else {
-        // Agregamos los módulos nuevos al final de la lista actual
         const actualizados = [...modulos, ...nuevosModulosArchivo];
         const exito = await guardarEnBackend(actualizados);
         if (exito) {
@@ -240,11 +228,10 @@ export default function DocumentacionPage() {
     } finally {
       setSubiendoArchivo(false);
       setModalSubidaAbierto(false);
-      if (fileInputRef.current) fileInputRef.current.value = ''; // Limpiamos el input
+      if (fileInputRef.current) fileInputRef.current.value = ''; 
     }
   };
 
-  // Filtro de búsqueda (Ctrl+F nativo o buscador de React)
   const modulosFiltrados = useMemo(() => {
     if (!busqueda) return modulos;
     const lower = busqueda.toLowerCase();
@@ -271,12 +258,10 @@ export default function DocumentacionPage() {
 
       <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
         
-        {/* BOTONES SUPERIORES */}
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-8">
           <Eyebrow>Módulos de Entrenamiento</Eyebrow>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* Botón: Descargar Ejemplo */}
             <button 
               onClick={descargarEjemplo}
               className="inline-flex items-center justify-center rounded-xl bg-white border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-brand-orange"
@@ -287,7 +272,6 @@ export default function DocumentacionPage() {
               Descargar Ejemplo
             </button>
 
-            {/* Input File Oculto */}
             <input 
               type="file" 
               accept=".txt" 
@@ -296,7 +280,6 @@ export default function DocumentacionPage() {
               onChange={procesarArchivoSubido}
             />
 
-            {/* Botón: Subir TXT */}
             <button 
               onClick={() => setModalSubidaAbierto(true)}
               className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-gray-800 hover:shadow-lg"
@@ -307,7 +290,6 @@ export default function DocumentacionPage() {
               Subir TXT
             </button>
 
-            {/* Botón: Manual */}
             <button 
               onClick={abrirCrear}
               className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
