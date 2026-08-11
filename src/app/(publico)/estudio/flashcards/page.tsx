@@ -75,10 +75,8 @@ export default function FlashcardsPage() {
       }, 300);
     } else {
       try {
-        // @ts-ignore
         await estudioService.guardarResultado({
           metodo: 'flashcard',
-          puntuacion: null, 
           total_preguntas: tarjetas.length,
           respuestas_detalle: nuevoHistorial
         });
