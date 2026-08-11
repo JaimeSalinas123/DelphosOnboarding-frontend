@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
-import { authService } from '@/services/authService';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseCuestionario = 'inicio' | 'cargando' | 'preguntas' | 'resultados' | 'error';
@@ -80,54 +79,36 @@ export default function CuestionarioPage() {
     if (indiceActual < preguntas.length - 1) {
       setIndiceActual(prev => prev + 1);
     } else {
-      const user = authService.getCurrentUser();
-      
-      if (user) {
-        let rawUserId = 
-          user.id || 
-          user.usuario_id || 
-          user.id_usuario || 
-          user.uid ||
-          (user as any)._id || 
-          (user as any).sub || 
-          (user as any).uuid ||
-          user.user?.id ||
-          user.data?.user?.id;
-        
-        if (rawUserId !== undefined && rawUserId !== null) {
-          const userIdString = String(rawUserId);
-          
-          // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
-          const respuestas_detalle = preguntas.map(p => {
-            const seleccion = respuestasUsuario[p.id];
-            const esCorrecta = seleccion ? (
-              p.respuesta_correcta.trim().toLowerCase() === seleccion.key.toLowerCase() ||
-              p.respuesta_correcta.trim().toLowerCase() === seleccion.val.toLowerCase()
-            ) : false;
+      // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
+      const respuestas_detalle = preguntas.map(p => {
+        const seleccion = respuestasUsuario[p.id];
+        const esCorrecta = seleccion ? (
+          p.respuesta_correcta.trim().toLowerCase() === seleccion.key.toLowerCase() ||
+          p.respuesta_correcta.trim().toLowerCase() === seleccion.val.toLowerCase()
+        ) : false;
 
-            return {
-              pregunta: p.pregunta,
-              respuesta_usuario: seleccion ? `${seleccion.key}) ${seleccion.val}` : 'Sin responder',
-              respuesta_correcta: p.respuesta_correcta,
-              es_correcta: esCorrecta
-            };
-          });
-          
-          try {
-            // @ts-ignore
-            await estudioService.guardarResultado({
-              usuario_id: userIdString,
-              metodo: 'cuestionario',
-              puntuacion: calcularPuntuacion(),
-              total_preguntas: preguntas.length,
-              respuestas_detalle // LO ENVIAMOS AL BACKEND
-            });
-            useProgresoStore.getState().cargar();
-          } catch (err) {
-            console.error("❌ Error al guardar el resultado en la BD:", err);
-          }
-        }
+        return {
+          pregunta: p.pregunta,
+          respuesta_usuario: seleccion ? `${seleccion.key}) ${seleccion.val}` : 'Sin responder',
+          respuesta_correcta: p.respuesta_correcta,
+          es_correcta: esCorrecta
+        };
+      });
+      
+      try {
+        // @ts-ignore
+        await estudioService.guardarResultado({
+          metodo: 'cuestionario',
+          puntuacion: calcularPuntuacion(),
+          total_preguntas: preguntas.length,
+          respuestas_detalle // LO ENVIAMOS AL BACKEND
+        });
+        useProgresoStore.getState().cargar();
+      } catch (err: any) {
+        console.error("❌ Error al guardar el resultado en la BD:", err);
+        alert("Error al guardar tu progreso: " + (err.message || "Revisa la consola"));
       }
+      
       setFase('resultados');
     }
   };

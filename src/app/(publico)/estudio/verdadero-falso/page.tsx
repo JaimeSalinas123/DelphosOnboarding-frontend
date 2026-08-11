@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
-import { authService } from '@/services/authService';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseVF = 'inicio' | 'cargando' | 'preguntas' | 'resultados' | 'error';
@@ -68,35 +67,31 @@ export default function VerdaderoFalsoPage() {
     if (indiceActual < preguntas.length - 1) {
       setIndiceActual(prev => prev + 1);
     } else {
-      const user = authService.getCurrentUser();
-      if (user) {
-        
-        // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
-        const respuestas_detalle = preguntas.map(p => {
-          const seleccion = respuestasUsuario[p.id];
-          const esCorrecta = seleccion ? p.respuesta_correcta.trim().toLowerCase() === seleccion.toLowerCase() : false;
+      // CONSTRUIMOS EL DETALLE DE LAS RESPUESTAS
+      const respuestas_detalle = preguntas.map(p => {
+        const seleccion = respuestasUsuario[p.id];
+        const esCorrecta = seleccion ? p.respuesta_correcta.trim().toLowerCase() === seleccion.toLowerCase() : false;
 
-          return {
-            pregunta: p.pregunta,
-            respuesta_usuario: seleccion || 'Sin responder',
-            respuesta_correcta: p.respuesta_correcta,
-            es_correcta: esCorrecta
-          };
+        return {
+          pregunta: p.pregunta,
+          respuesta_usuario: seleccion || 'Sin responder',
+          respuesta_correcta: p.respuesta_correcta,
+          es_correcta: esCorrecta
+        };
+      });
+      
+      try {
+        // @ts-ignore
+        await estudioService.guardarResultado({
+          metodo: 'verdadero_falso',
+          puntuacion: calcularPuntuacion(),
+          total_preguntas: preguntas.length,
+          respuestas_detalle // LO ENVIAMOS AL BACKEND
         });
-        
-        try {
-          // @ts-ignore
-          await estudioService.guardarResultado({
-            usuario_id: user.id,
-            metodo: 'verdadero_falso',
-            puntuacion: calcularPuntuacion(),
-            total_preguntas: preguntas.length,
-            respuestas_detalle // LO ENVIAMOS AL BACKEND
-          });
-          useProgresoStore.getState().cargar();
-        } catch (err) {
-          console.error("No se pudo guardar la nota en la bd", err);
-        }
+        useProgresoStore.getState().cargar();
+      } catch (err: any) {
+        console.error("No se pudo guardar la nota en la bd", err);
+        alert("Error al guardar tu progreso: " + (err.message || "Revisa la consola"));
       }
       setFase('resultados');
     }
