@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { estudioService, type Pregunta } from '@/services/estudioService';
-import { authService } from '@/services/authService';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 
 type FaseFlashcard = 'inicio' | 'cargando' | 'estudio' | 'fin' | 'error';
@@ -75,21 +74,18 @@ export default function FlashcardsPage() {
         setRespuestaEscrita('');
       }, 300);
     } else {
-      const user = authService.getCurrentUser();
-      if (user) {
-        try {
-          // @ts-ignore
-          await estudioService.guardarResultado({
-            usuario_id: user.id,
-            metodo: 'flashcard',
-            puntuacion: null, 
-            total_preguntas: tarjetas.length,
-            respuestas_detalle: nuevoHistorial
-          });
-          useProgresoStore.getState().cargar();
-        } catch (err) {
-          console.error("No se pudo guardar el registro en la bd", err);
-        }
+      try {
+        // @ts-ignore
+        await estudioService.guardarResultado({
+          metodo: 'flashcard',
+          puntuacion: null, 
+          total_preguntas: tarjetas.length,
+          respuestas_detalle: nuevoHistorial
+        });
+        useProgresoStore.getState().cargar();
+      } catch (err: any) {
+        console.error("No se pudo guardar el registro en la bd", err);
+        alert("Error al guardar tu progreso: " + (err.message || "Revisa la consola"));
       }
       setFase('fin');
     }
