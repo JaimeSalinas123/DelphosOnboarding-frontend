@@ -105,5 +105,15 @@ export const estudioService = {
   obtenerResultados: async (): Promise<ResultadoEstudio[]> => {
     const response = await fetch(`${API_URL}/estudio/resultados`, { headers: getAuthHeaders() });
     return handleResponse(response, 'Error al obtener resultados');
+  },
+
+  // ESTA ES LA FUNCIÓN QUE FALTABA
+  guardarResultado: async (datos: Partial<ResultadoEstudio>): Promise<ResultadoEstudio> => {
+    const response = await fetch(`${API_URL}/estudio/resultados`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(datos),
+    });
+    return handleResponse(response, 'Error al guardar tu progreso de estudio');
   }
 };
