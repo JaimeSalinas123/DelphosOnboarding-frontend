@@ -3,11 +3,42 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 import type { ProgresoPasante } from '@/services/progresoService';
 import { etiquetaRol } from '@/lib/roles';
+
+// =======================================================================
+// 🚀 OPTIMIZACIÓN EXTREMA: Lazy Loading de Recharts
+// Evita descargar todo el motor de gráficos hasta que la página ya esté visible.
+// =======================================================================
+const GraficoProgreso = dynamic(
+  () => import('recharts').then((recharts) => {
+    const { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } = recharts;
+    return function Grafico({ valor }: { valor: number }) {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart
+            innerRadius="72%"
+            outerRadius="100%"
+            data={[{ value: valor }]}
+            startAngle={90}
+            endAngle={-270}
+          >
+            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+            <RadialBar dataKey="value" cornerRadius={20} fill="var(--brand-orange)" background={{ fill: 'var(--neutral-secondary)' }} />
+          </RadialBarChart>
+        </ResponsiveContainer>
+      );
+    };
+  }),
+  { 
+    ssr: false, 
+    // Muestra un esqueleto suave mientras se carga la gráfica en segundo plano
+    loading: () => <div className="h-full w-full animate-pulse rounded-full bg-neutral-secondary"></div> 
+  }
+);
 
 function iniciales(nombre: string) {
   const partes = nombre.trim().split(/\s+/);
@@ -159,19 +190,10 @@ export default function PerfilPage() {
                 </div>
               ) : (
                 <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row">
+                  
+                  {/* Reemplazamos la importación directa por nuestro componente Optimizado */}
                   <div className="relative h-36 w-36 flex-shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadialBarChart
-                        innerRadius="72%"
-                        outerRadius="100%"
-                        data={[{ value: Math.min(100, progreso.porcentaje_total) }]}
-                        startAngle={90}
-                        endAngle={-270}
-                      >
-                        <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                        <RadialBar dataKey="value" cornerRadius={20} fill="var(--brand-orange)" background={{ fill: 'var(--neutral-secondary)' }} />
-                      </RadialBarChart>
-                    </ResponsiveContainer>
+                    <GraficoProgreso valor={Math.min(100, progreso.porcentaje_total)} />
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-heading">
                         {Math.round(progreso.porcentaje_total)}%
