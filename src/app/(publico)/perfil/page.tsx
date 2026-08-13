@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 import type { ProgresoPasante } from '@/services/progresoService';
 import { etiquetaRol } from '@/lib/roles';
-import { INSIGNIAS } from '@/lib/insignias';
+import { INSIGNIAS, insigniaDesbloqueada } from '@/lib/insignias';
 import InsigniaMedalla from '@/components/global/InsigniaMedalla';
 
 // =======================================================================
@@ -270,20 +270,20 @@ export default function PerfilPage() {
               Se desbloquean automáticamente al completar cada etapa del onboarding.
             </p>
 
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {INSIGNIAS.map((insignia) => {
-                const valor = progreso[insignia.clave];
-                const desbloqueada = valor >= 100;
+                const valor = insignia.clave ? progreso[insignia.clave] : 100;
+                const desbloqueada = insigniaDesbloqueada(insignia, progreso);
                 return (
                   <div
-                    key={insignia.clave}
+                    key={insignia.id}
                     className={`relative flex flex-col items-center gap-3 rounded-2xl border p-5 text-center transition-all ${
                       desbloqueada
                         ? 'border-brand-orange/30 bg-brand-orange/5 shadow-sm'
                         : 'border-default bg-neutral-secondary/40'
                     }`}
                   >
-                    <InsigniaMedalla forma={insignia.forma} desbloqueada={desbloqueada} tamano={72} />
+                    <InsigniaMedalla desbloqueada={desbloqueada} tamano={72} />
 
                     <div>
                       <p className={`text-sm font-bold ${desbloqueada ? 'text-heading' : 'text-brand-gray'}`}>

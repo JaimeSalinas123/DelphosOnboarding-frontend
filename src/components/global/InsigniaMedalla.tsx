@@ -1,12 +1,10 @@
 import { useId } from 'react';
-import { FORMA_PATH, type FormaInsignia } from '@/lib/insignias';
+import { HEXAGONO_PATH } from '@/lib/insignias';
 
 export default function InsigniaMedalla({
-  forma,
   desbloqueada,
   tamano = 64,
 }: {
-  forma: FormaInsignia;
   desbloqueada: boolean;
   tamano?: number;
 }) {
@@ -23,7 +21,7 @@ export default function InsigniaMedalla({
           </linearGradient>
         </defs>
         <path
-          d={FORMA_PATH[forma]}
+          d={HEXAGONO_PATH}
           fill={desbloqueada ? `url(#${gradId})` : 'var(--neutral-tertiary)'}
           stroke={desbloqueada ? 'var(--brand-black)' : 'var(--default)'}
           strokeWidth="3"
@@ -32,9 +30,10 @@ export default function InsigniaMedalla({
       </svg>
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         {desbloqueada ? (
-          <svg className="h-[36%] w-[36%] text-white" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
+          // Mismo truco que en la ventana del Asistente Delphos: brightness-0 + invert
+          // deja el logo completamente blanco sin importar sus colores originales.
+          // eslint-disable-next-line @next/next/no-img-element -- ícono decorativo chico, no vale la pena next/image acá
+          <img src="/images/logo.svg" alt="" className="h-[44%] w-[44%] object-contain brightness-0 invert" />
         ) : (
           <svg className="h-[32%] w-[32%] text-brand-gray" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h12" />

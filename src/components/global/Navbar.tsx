@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { authService } from "@/services/authService";
 import { useProgresoStore } from "@/lib/useProgresoStore";
-import { INSIGNIAS } from "@/lib/insignias";
+import { INSIGNIAS, insigniaDesbloqueada } from "@/lib/insignias";
 import InsigniaMedalla from "@/components/global/InsigniaMedalla";
 
 // Circunferencia del anillo de progreso (r=15.5): 2 * PI * 15.5
@@ -181,7 +181,7 @@ export default function Navbar() {
               </button>
 
               {progresoMenuOpen ? (
-                <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-xl border border-default bg-neutral-primary p-4 shadow-lg">
+                <div className="absolute right-0 mt-3 w-80 overflow-hidden rounded-xl border border-default bg-neutral-primary p-4 shadow-lg">
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">
                     Tu progreso de onboarding
                   </p>
@@ -210,13 +210,12 @@ export default function Navbar() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">
                       Insignias
                     </p>
-                    <div className="mt-3 flex justify-between gap-2">
+                    <div className="mt-3 grid grid-cols-4 gap-2">
                       {INSIGNIAS.map((insignia) => {
-                        const valor = progreso[insignia.clave];
-                        const desbloqueada = valor >= 100;
+                        const desbloqueada = insigniaDesbloqueada(insignia, progreso);
                         return (
-                          <div key={insignia.clave} className="flex flex-col items-center gap-1.5" title={insignia.descripcion}>
-                            <InsigniaMedalla forma={insignia.forma} desbloqueada={desbloqueada} tamano={40} />
+                          <div key={insignia.id} className="flex flex-col items-center gap-1.5" title={insignia.descripcion}>
+                            <InsigniaMedalla desbloqueada={desbloqueada} tamano={40} />
                             <span
                               className={`text-center text-[10px] font-medium leading-tight ${
                                 desbloqueada ? "text-heading" : "text-brand-gray"
