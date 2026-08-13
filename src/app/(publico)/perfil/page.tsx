@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 import type { ProgresoPasante } from '@/services/progresoService';
 import { etiquetaRol } from '@/lib/roles';
+import { INSIGNIAS } from '@/lib/insignias';
+import InsigniaMedalla from '@/components/global/InsigniaMedalla';
 
 // =======================================================================
 // 🚀 OPTIMIZACIÓN EXTREMA: Lazy Loading de Recharts
@@ -259,6 +261,56 @@ export default function PerfilPage() {
             </section>
           )}
         </div>
+
+        {/* INSIGNIAS (solo pasantes): se desbloquean solas al llegar a 100% en cada etapa. */}
+        {esPasante && progresoCargado && (
+          <section className="mt-6 rounded-3xl border border-default bg-neutral-primary p-6 shadow-sm sm:p-7">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-brand-gray">Insignias</h2>
+            <p className="mt-1 text-xs text-body">
+              Se desbloquean automáticamente al completar cada etapa del onboarding.
+            </p>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {INSIGNIAS.map((insignia) => {
+                const valor = progreso[insignia.clave];
+                const desbloqueada = valor >= 100;
+                return (
+                  <div
+                    key={insignia.clave}
+                    className={`relative flex flex-col items-center gap-3 rounded-2xl border p-5 text-center transition-all ${
+                      desbloqueada
+                        ? 'border-brand-orange/30 bg-brand-orange/5 shadow-sm'
+                        : 'border-default bg-neutral-secondary/40'
+                    }`}
+                  >
+                    <InsigniaMedalla forma={insignia.forma} desbloqueada={desbloqueada} tamano={72} />
+
+                    <div>
+                      <p className={`text-sm font-bold ${desbloqueada ? 'text-heading' : 'text-brand-gray'}`}>
+                        {insignia.nombre}
+                      </p>
+                      <p className="mt-1 text-xs text-body">{insignia.descripcion}</p>
+                    </div>
+
+                    {!desbloqueada && (
+                      <div className="mt-1 w-full">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-tertiary">
+                          <div
+                            className="h-full rounded-full bg-brand-orange/60 transition-all"
+                            style={{ width: `${Math.min(100, valor)}%` }}
+                          />
+                        </div>
+                        <p className="mt-1.5 text-[10px] font-medium text-brand-gray">
+                          {Math.round(valor)}% completado
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
