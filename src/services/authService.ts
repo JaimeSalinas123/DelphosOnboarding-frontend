@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 // Tiempo máximo de espera para evitar solicitudes colgadas indefinidamente.
 export const REQUEST_TIMEOUT_MS = 15000;
