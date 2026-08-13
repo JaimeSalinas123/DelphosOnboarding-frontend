@@ -126,10 +126,10 @@ export default function EcosistemaPage() {
   const seleccionadoNombre = seleccionadoModulo?.nombre ?? 'ninguno';
 
   return (
-    <main className="relative w-full flex-1 overflow-hidden bg-white">
+    <main className="fixed top-0 left-0 z-0 h-screen w-screen overflow-hidden bg-[#f8f9fa]">
       <FondoEcosistema />
 
-      <header className="pointer-events-none absolute left-0 top-0 z-10 max-w-[80vw] p-4 sm:p-5 md:p-7">
+      <header className="pointer-events-none absolute left-0 top-[72px] z-10 max-w-[80vw] p-4 sm:p-5 md:p-7">
         <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400 sm:text-[11px] sm:tracking-[0.35em]">
           DEINSA Global
         </p>
@@ -159,7 +159,8 @@ export default function EcosistemaPage() {
         </AnimatePresence>
       </header>
 
-      <div className="absolute inset-0 z-[1]">
+      {/* Se añadió `translate-x-12 sm:translate-x-16` para desplazar el 3D hacia la derecha y centrarlo */}
+      <div className="absolute inset-0 z-[1] translate-x-12 sm:translate-x-16">
         {mounted ? (
           <Suspense fallback={<Loader />}>
             <EcosistemaScene

@@ -7,10 +7,6 @@ import SessionExpired from '@/components/global/SessionExpired';
 import Paginador from '@/components/global/Paginador';
 import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
-// IMPORTAMOS LAS LIBRERÍAS DE EXCEL
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-
 type ModoEstudio = 'cuestionario' | 'flashcard' | 'verdadero_falso';
 type VistaEstudio = 'preguntas' | 'resultados';
 
@@ -44,7 +40,7 @@ const formatoFecha = new Intl.DateTimeFormat('es', {
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
+    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-4 sm:mb-6">
       <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
       {children}
     </div>
@@ -318,11 +314,15 @@ export default function EstudioPage() {
   const sesionExpirada = esErrorSesionPreguntas || esErrorSesionResultados;
 
   // ==========================================
-  // FUNCIÓN: GENERAR EXCEL GENERAL (TODA LA EMPRESA)
+  // 🚀 LAZY LOADING EXCEL (PERFORMANCE)
   // ==========================================
   const generarExcelGeneral = async () => {
     try {
       setDescargandoGeneral(true);
+      
+      const ExcelJS = (await import('exceljs')).default;
+      const { saveAs } = await import('file-saver');
+
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Evaluaciones Generales', { views: [{ showGridLines: false }] });
 
@@ -385,12 +385,13 @@ export default function EstudioPage() {
     }
   };
 
-  // ==========================================
-  // FUNCIÓN: GENERAR EXCEL ESPECÍFICO (POR USUARIO)
-  // ==========================================
   const generarExcelUsuario = async (usuario: UsuarioAgrupado) => {
     try {
       setDescargandoUsuario(true);
+      
+      const ExcelJS = (await import('exceljs')).default;
+      const { saveAs } = await import('file-saver');
+
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet(`Reporte_${usuario.nombre.split(' ')[0]}`, {
         views: [{ showGridLines: false }]
@@ -487,7 +488,7 @@ export default function EstudioPage() {
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
       
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="mb-8 sm:mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
             Módulos de Aprendizaje
@@ -495,7 +496,7 @@ export default function EstudioPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
             Estudio
           </h1>
-          <p className="mt-2 text-base text-gray-500">
+          <p className="mt-2 text-sm sm:text-base text-gray-500">
             {vista === 'preguntas'
               ? 'Gestiona las preguntas y respuestas de los diferentes métodos.'
               : 'Revisa el progreso y resultados consolidados de los usuarios.'}
@@ -503,10 +504,10 @@ export default function EstudioPage() {
         </div>
         
         {!sesionExpirada && (
-          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0">
+          <div className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm shrink-0 w-full sm:w-auto">
             <button
               onClick={() => cambiarVista('preguntas')}
-              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+              className={`flex-1 sm:flex-none rounded-lg px-4 sm:px-6 py-2.5 text-[13px] sm:text-sm font-bold transition-all duration-300 ${
                 vista === 'preguntas'
                   ? 'bg-gray-900 text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -516,7 +517,7 @@ export default function EstudioPage() {
             </button>
             <button
               onClick={() => cambiarVista('resultados')}
-              className={`rounded-lg px-6 py-2.5 text-sm font-bold transition-all duration-300 ${
+              className={`flex-1 sm:flex-none rounded-lg px-4 sm:px-6 py-2.5 text-[13px] sm:text-sm font-bold transition-all duration-300 ${
                 vista === 'resultados'
                   ? 'bg-gray-900 text-white shadow-md'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -535,29 +536,31 @@ export default function EstudioPage() {
       ) : (
         <>
           {vista === 'preguntas' && (
-            <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+            <section className="rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100 overflow-hidden">
               
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 sm:mb-8">
                 <Eyebrow>Banco de Preguntas</Eyebrow>
+                {/* AJUSTE RESPONSIVE: Botón "Agregar Pregunta" más compacto en móvil */}
                 <button 
                   onClick={abrirCrear}
-                  className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
+                  className="inline-flex self-start sm:self-auto items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-4 py-2 sm:px-5 sm:py-2.5 text-[13px] sm:text-sm font-bold text-white shadow-md transition-all hover:scale-105 hover:shadow-lg hover:shadow-brand-orange/20"
                 >
-                  <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <svg className="mr-1.5 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                   </svg>
                   Agregar Pregunta
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-2.5 pb-6">
+              {/* AJUSTE RESPONSIVE: Scroll horizontal en pestañas para celular */}
+              <div className="flex overflow-x-auto sm:flex-wrap items-center gap-2 sm:gap-2.5 pb-4 sm:pb-6 -mx-5 px-5 sm:mx-0 sm:px-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {['cuestionario', 'flashcard', 'verdadero_falso'].map((modo) => (
                   <button
                     key={modo}
                     onClick={() => setModoActivo(modo as ModoEstudio)}
-                    className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 ease-out ${
+                    className={`shrink-0 snap-start whitespace-nowrap rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-[12px] sm:text-sm font-semibold transition-all duration-300 ease-out ${
                       modoActivo === modo
-                        ? 'bg-gray-900 text-white shadow-md shadow-gray-900/20 scale-105'
+                        ? 'bg-gray-900 text-white shadow-md shadow-gray-900/20 sm:scale-105'
                         : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
                     }`}
                   >
@@ -567,86 +570,122 @@ export default function EstudioPage() {
               </div>
 
               {cargandoPreguntas ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-24">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+                <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
                   <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando banco de preguntas...</p>
                 </div>
               ) : errorPreguntas ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-                  <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24 text-center">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
-                  <p className="text-base font-bold text-gray-900">Error al cargar preguntas</p>
-                  <p className="max-w-sm text-sm text-gray-500">{errorPreguntas}</p>
-                  <button onClick={() => setCargandoPreguntas(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+                  <p className="text-sm sm:text-base font-bold text-gray-900">Error al cargar preguntas</p>
+                  <p className="max-w-sm text-xs sm:text-sm text-gray-500">{errorPreguntas}</p>
+                  <button onClick={() => setCargandoPreguntas(true)} className="mt-2 rounded-xl bg-gray-900 px-5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
                 </div>
               ) : preguntasFiltradas.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
-                  <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="flex flex-col items-center justify-center gap-2 py-16 sm:py-24 text-center">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">Sin preguntas registradas</p>
-                  <p className="text-sm text-gray-500">Agrega la primera pregunta para este método.</p>
+                  <p className="text-base sm:text-lg font-bold text-gray-900">Sin preguntas registradas</p>
+                  <p className="text-xs sm:text-sm text-gray-500">Agrega la primera pregunta para este método.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto mt-4">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        {modoActivo === 'cuestionario' && (
-                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nivel</th>
-                        )}
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Pregunta</th>
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Respuesta Correcta</th>
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {preguntasFiltradas.map((p) => (
-                        <tr key={p.id} className="transition-colors hover:bg-gray-50/50">
+                <>
+                  {/* AJUSTE RESPONSIVE: VISTA MÓVIL EN TARJETAS */}
+                  <div className="md:hidden flex flex-col gap-4 mt-2">
+                    {preguntasFiltradas.map((p) => (
+                      <div key={p.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-brand-orange/40 rounded-l-2xl"></div>
+                        
+                        <div className="flex flex-col border-b border-gray-50 pb-3 pl-2">
+                          <span className="font-medium text-gray-700 text-[13px] leading-snug">{p.pregunta}</span>
+                        </div>
+
+                        <div className="flex flex-col gap-2.5 pl-2">
                           {modoActivo === 'cuestionario' && (
-                            <td className="px-4 py-5 font-bold text-gray-900 whitespace-nowrap">{p.nivel || '—'}</td>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Nivel</span>
+                              <span className="font-bold text-gray-900 text-xs">{p.nivel || '—'}</span>
+                            </div>
                           )}
-                          <td className="px-4 py-5 font-medium text-gray-600 max-w-md">{p.pregunta}</td>
-                          <td className="px-4 py-5">
-                            <span className="inline-flex items-center rounded-md bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700 border border-green-200 shadow-sm">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Respuesta Correcta</span>
+                            <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-[11px] font-bold text-green-700 border border-green-200">
                               {p.respuesta_correcta}
                             </span>
-                          </td>
-                          <td className="px-4 py-5 text-right whitespace-nowrap">
-                            <button onClick={() => abrirEditar(p)} className="text-sm font-bold text-brand-orange hover:text-orange-700 mr-4 transition-colors">Editar</button>
-                            <button onClick={() => handleEliminar(p.id)} className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors">Eliminar</button>
-                          </td>
+                          </div>
+                          
+                          <div className="flex justify-end gap-5 mt-2 pt-3 border-t border-gray-50">
+                            <button onClick={() => abrirEditar(p)} className="text-[11px] uppercase tracking-wider font-bold text-brand-orange hover:text-orange-700">Editar</button>
+                            <button onClick={() => handleEliminar(p.id)} className="text-[11px] uppercase tracking-wider font-bold text-red-500 hover:text-red-700">Eliminar</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* VISTA ESCRITORIO: TABLA ORIGINAL INTACTA */}
+                  <div className="hidden md:block overflow-x-auto mt-4">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          {modoActivo === 'cuestionario' && (
+                            <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nivel</th>
+                          )}
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Pregunta</th>
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Respuesta Correcta</th>
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {preguntasFiltradas.map((p) => (
+                          <tr key={p.id} className="transition-colors hover:bg-gray-50/50">
+                            {modoActivo === 'cuestionario' && (
+                              <td className="px-4 py-5 font-bold text-gray-900 whitespace-nowrap">{p.nivel || '—'}</td>
+                            )}
+                            <td className="px-4 py-5 font-medium text-gray-600 max-w-md">{p.pregunta}</td>
+                            <td className="px-4 py-5">
+                              <span className="inline-flex items-center rounded-md bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700 border border-green-200 shadow-sm">
+                                {p.respuesta_correcta}
+                              </span>
+                            </td>
+                            <td className="px-4 py-5 text-right whitespace-nowrap">
+                              <button onClick={() => abrirEditar(p)} className="text-sm font-bold text-brand-orange hover:text-orange-700 mr-4 transition-colors">Editar</button>
+                              <button onClick={() => handleEliminar(p.id)} className="text-sm font-bold text-red-500 hover:text-red-700 transition-colors">Eliminar</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
           )}
 
           {vista === 'resultados' && (
-            <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+            <section className="rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <Eyebrow>Registro de Evaluaciones</Eyebrow>
                 
-                {/* BOTÓN DESCARGA GENERAL */}
+                {/* AJUSTE RESPONSIVE: Botón "Descargar Reporte" más compacto en móvil */}
                 {!cargandoResultados && !errorResultados && resultadosAgrupados.length > 0 && (
                   <button
                     onClick={generarExcelGeneral}
                     disabled={descargandoGeneral}
-                    className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
+                    className="inline-flex self-start sm:self-auto items-center justify-center rounded-lg sm:rounded-xl bg-brand-orange px-4 py-2 sm:px-5 sm:py-2.5 text-[13px] sm:text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
                   >
                     {descargandoGeneral ? (
                       <div className="flex items-center gap-2">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                        Generando Excel...
+                        <div className="h-3 w-3 sm:h-4 sm:w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                        Generando...
                       </div>
                     ) : (
                       <>
-                        <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg className="mr-1.5 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
                         Descargar Reporte General
@@ -657,7 +696,7 @@ export default function EstudioPage() {
               </div>
 
               {/* FILTROS TIPO ENCUESTA APLICADOS A ESTUDIO */}
-              <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="mb-6 sm:mb-8 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:flex-wrap sm:items-center">
                 <SelectorDepartamento
                   value={departamentoResultados}
                   onChange={(val) => { setDepartamentoResultados(val); setPaginaResultados(1); }}
@@ -671,7 +710,7 @@ export default function EstudioPage() {
                     value={fechaDesdeResultados}
                     onChange={(e) => { setFechaDesdeResultados(e.target.value); setPaginaResultados(1); }}
                     max={fechaHastaResultados || undefined}
-                    className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                    className="flex-1 sm:flex-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                   />
                 </div>
 
@@ -682,7 +721,7 @@ export default function EstudioPage() {
                     value={fechaHastaResultados}
                     onChange={(e) => { setFechaHastaResultados(e.target.value); setPaginaResultados(1); }}
                     min={fechaDesdeResultados || undefined}
-                    className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                    className="flex-1 sm:flex-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                   />
                 </div>
 
@@ -690,7 +729,7 @@ export default function EstudioPage() {
                   <button
                     type="button"
                     onClick={limpiarFiltrosResultados}
-                    className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
+                    className="self-start sm:self-auto text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2 pt-1 sm:pt-0"
                   >
                     Limpiar filtros
                   </button>
@@ -698,88 +737,147 @@ export default function EstudioPage() {
               </div>
               
               {cargandoResultados ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-24">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
+                <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
                   <p className="text-sm font-medium text-gray-500 animate-pulse">Sincronizando evaluaciones...</p>
                 </div>
               ) : errorResultados ? (
-                <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-                  <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24 text-center px-4">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
-                  <p className="text-base font-bold text-gray-900">Error al cargar resultados</p>
-                  <p className="max-w-sm text-sm text-gray-500">{errorResultados}</p>
-                  <button onClick={() => setCargandoResultados(true)} className="mt-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
+                  <p className="text-sm sm:text-base font-bold text-gray-900">Error al cargar resultados</p>
+                  <p className="max-w-sm text-xs sm:text-sm text-gray-500">{errorResultados}</p>
+                  <button onClick={() => setCargandoResultados(true)} className="mt-2 rounded-xl bg-gray-900 px-5 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white transition-all hover:bg-gray-800 hover:shadow-md">Reintentar</button>
                 </div>
               ) : resultadosAgrupados.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
-                  <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                <div className="flex flex-col items-center justify-center gap-2 py-16 sm:py-24 text-center px-4">
+                  <div className="h-12 w-12 sm:h-16 sm:w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
+                    <svg className="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                   </div>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-base sm:text-lg font-bold text-gray-900">
                     {hayFiltrosResultados ? 'Sin coincidencias' : 'Sin evaluaciones'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs sm:text-sm text-gray-500 max-w-sm">
                     {hayFiltrosResultados 
                       ? 'Ningún resultado coincide con estos filtros.' 
                       : 'Cuando un usuario complete un método de estudio, aparecerá aquí.'}
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto mt-4">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Usuario</th>
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-center">Total Intentos</th>
-                        <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {resultadosPaginados.map((usuario) => (
-                        <tr key={usuario.email} className="transition-colors hover:bg-gray-50/50">
-                          <td className="px-4 py-5">
-                            <p className="font-bold text-gray-900">{usuario.nombre}</p>
-                            <p className="text-xs font-medium text-gray-500 mt-0.5">{usuario.email}</p>
-                          </td>
-                          <td className="px-4 py-5 font-medium text-gray-600">
-                            {usuario.departamento ? (
-                              <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                                {usuario.departamento}
-                              </span>
-                            ) : '—'}
-                          </td>
-                          <td className="px-4 py-5 text-center">
-                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-orange/10 font-black text-brand-orange shadow-inner">
+                <>
+                  {/* AJUSTE RESPONSIVE: VISTA MÓVIL EN TARJETAS PARA EVALUACIONES */}
+                  <div className="md:hidden flex flex-col gap-4 mt-2">
+                    {resultadosPaginados.map((usuario) => (
+                      <div key={usuario.email} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm flex flex-col gap-3 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-brand-orange/40 rounded-l-2xl"></div>
+                        
+                        <div className="flex flex-col border-b border-gray-50 pb-3 pl-2">
+                          <span className="font-extrabold text-gray-900 text-[14px]">{usuario.nombre}</span>
+                          <span className="text-[12px] text-gray-500 font-medium break-all mt-0.5">{usuario.email}</span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2.5 pl-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Departamento</span>
+                            <span className="font-medium text-gray-700">
+                              {usuario.departamento ? (
+                                <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-700">
+                                  {usuario.departamento}
+                                </span>
+                              ) : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Total Intentos</span>
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-orange/10 font-black text-brand-orange text-[11px] shadow-inner">
                               {usuario.intentos.length}
                             </span>
-                          </td>
-                          <td className="px-4 py-5 text-right whitespace-nowrap">
+                          </div>
+                          
+                          <div className="mt-1 pt-2 border-t border-gray-50 text-right">
                             <button
                               onClick={() => setUsuarioSeleccionado(usuario)}
-                              className="text-sm font-bold text-brand-orange hover:text-orange-700 transition-colors"
+                              className="text-[11px] uppercase tracking-wider font-bold text-brand-orange hover:text-orange-700"
                             >
                               Ver historial
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  
-                  <div className="mt-4 pt-5 border-t border-gray-100 w-full">
-                    <Paginador 
-                      paginacion={{
-                        pagina: paginaResultados,
-                        limite: RESULTADOS_POR_PAGINA,
-                        total: resultadosAgrupados.length,
-                        totalPaginas: Math.ceil(resultadosAgrupados.length / RESULTADOS_POR_PAGINA)
-                      }} 
-                      onCambiarPagina={setPaginaResultados} 
-                    />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+
+                  {/* VISTA ESCRITORIO: TABLA ORIGINAL INTACTA */}
+                  <div className="hidden md:block overflow-x-auto mt-4">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Usuario</th>
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-center">Total Intentos</th>
+                          <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {resultadosPaginados.map((usuario) => (
+                          <tr key={usuario.email} className="transition-colors hover:bg-gray-50/50">
+                            <td className="px-4 py-5">
+                              <p className="font-bold text-gray-900">{usuario.nombre}</p>
+                              <p className="text-xs font-medium text-gray-500 mt-0.5">{usuario.email}</p>
+                            </td>
+                            <td className="px-4 py-5 font-medium text-gray-600">
+                              {usuario.departamento ? (
+                                <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                  {usuario.departamento}
+                                </span>
+                              ) : '—'}
+                            </td>
+                            <td className="px-4 py-5 text-center">
+                              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-orange/10 font-black text-brand-orange shadow-inner">
+                                {usuario.intentos.length}
+                              </span>
+                            </td>
+                            <td className="px-4 py-5 text-right whitespace-nowrap">
+                              <button
+                                onClick={() => setUsuarioSeleccionado(usuario)}
+                                className="text-sm font-bold text-brand-orange hover:text-orange-700 transition-colors"
+                              >
+                                Ver historial
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    
+                    <div className="mt-4 pt-5 border-t border-gray-100 w-full">
+                      <Paginador 
+                        paginacion={{
+                          pagina: paginaResultados,
+                          limite: RESULTADOS_POR_PAGINA,
+                          total: resultadosAgrupados.length,
+                          totalPaginas: Math.ceil(resultadosAgrupados.length / RESULTADOS_POR_PAGINA)
+                        }} 
+                        onCambiarPagina={setPaginaResultados} 
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Paginador Móvil */}
+                  <div className="md:hidden mt-6 pt-5 border-t border-gray-100 flex justify-center w-full">
+                      <Paginador 
+                        paginacion={{
+                          pagina: paginaResultados,
+                          limite: RESULTADOS_POR_PAGINA,
+                          total: resultadosAgrupados.length,
+                          totalPaginas: Math.ceil(resultadosAgrupados.length / RESULTADOS_POR_PAGINA)
+                        }} 
+                        onCambiarPagina={setPaginaResultados} 
+                      />
+                  </div>
+
+                </>
               )}
             </section>
           )}
@@ -789,23 +887,23 @@ export default function EstudioPage() {
       {/* MODALES SE MANTIENEN IGUAL */}
       {!sesionExpirada && modalAbierto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl overflow-hidden">
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-6">
+          <div className="w-full max-w-2xl rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-5 sm:mb-6">
               {editandoId ? 'Editar Pregunta' : 'Nueva Pregunta'}
             </h2>
             
-            <form onSubmit={handleGuardar} className="flex flex-col gap-5">
-              <div className={`grid grid-cols-1 ${formulario.tipo === 'cuestionario' ? 'sm:grid-cols-2' : ''} gap-5`}>
+            <form onSubmit={handleGuardar} className="flex flex-col gap-4 sm:gap-5">
+              <div className={`grid grid-cols-1 ${formulario.tipo === 'cuestionario' ? 'sm:grid-cols-2' : ''} gap-4 sm:gap-5`}>
                 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Método de Estudio</label>
+                  <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 sm:mb-2">Método de Estudio</label>
                   <select
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm disabled:opacity-60"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm disabled:opacity-60"
                     value={formulario.tipo}
                     onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value as ModoEstudio })}
                     disabled={!!editandoId}
                   >
-                    <option value="cuestionario">Cuestionario (Opciones A,B,C,D)</option>
+                    <option value="cuestionario">Cuestionario (A,B,C,D)</option>
                     <option value="flashcard">Flashcards</option>
                     <option value="verdadero_falso">Verdadero o Falso</option>
                   </select>
@@ -813,11 +911,11 @@ export default function EstudioPage() {
                 
                 {formulario.tipo === 'cuestionario' && (
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Nivel o Módulo</label>
+                    <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 sm:mb-2">Nivel o Módulo</label>
                     
                     {!modoNuevoNivel ? (
                       <select
-                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                         value={formulario.nivel}
                         required={formulario.tipo === 'cuestionario'}
                         onChange={(e) => {
@@ -841,7 +939,7 @@ export default function EstudioPage() {
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          className="w-full rounded-xl border border-brand-orange bg-white py-3 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                          className="w-full rounded-xl border border-brand-orange bg-white py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                           value={formulario.nivel}
                           onChange={(e) => setFormulario({ ...formulario, nivel: e.target.value })}
                           placeholder="Ej. Nivel 5 — Tema"
@@ -854,10 +952,10 @@ export default function EstudioPage() {
                             setModoNuevoNivel(false);
                             setFormulario({ ...formulario, nivel: '' });
                           }}
-                          className="shrink-0 flex items-center justify-center w-12 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                          className="shrink-0 flex items-center justify-center w-10 sm:w-12 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
                           title="Cancelar"
                         >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
@@ -868,9 +966,9 @@ export default function EstudioPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Pregunta</label>
+                <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 sm:mb-2">Pregunta</label>
                 <textarea
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                   rows={3}
                   value={formulario.pregunta}
                   onChange={(e) => setFormulario({ ...formulario, pregunta: e.target.value })}
@@ -880,13 +978,13 @@ export default function EstudioPage() {
               </div>
 
               {formulario.tipo === 'cuestionario' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-gray-50 p-3 sm:p-4 rounded-xl border border-gray-100">
                   {(['a', 'b', 'c', 'd'] as const).map(letra => (
                     <div key={letra}>
-                      <label className="block text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500 mb-2">Opción {letra.toUpperCase()}</label>
+                      <label className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] text-gray-500 mb-1 sm:mb-2">Opción {letra.toUpperCase()}</label>
                       <input
                         type="text"
-                        className="w-full rounded-lg border border-gray-200 bg-white py-2.5 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                        className="w-full rounded-lg border border-gray-200 bg-white py-2 sm:py-2.5 px-3 sm:px-4 text-[12px] sm:text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                         value={formulario[`opcion_${letra}`]}
                         onChange={(e) => setFormulario({ ...formulario, [`opcion_${letra}`]: e.target.value })}
                         placeholder={`Respuesta ${letra.toUpperCase()}`}
@@ -898,13 +996,13 @@ export default function EstudioPage() {
               )}
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5 sm:mb-2">
                   {formulario.tipo === 'cuestionario' ? 'Opción Correcta (A, B, C o D)' : 'Respuesta Correcta'}
                 </label>
                 
                 {formulario.tipo === 'verdadero_falso' ? (
                   <select
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                     value={formulario.respuesta_correcta}
                     onChange={(e) => setFormulario({ ...formulario, respuesta_correcta: e.target.value })}
                     required
@@ -916,7 +1014,7 @@ export default function EstudioPage() {
                 ) : (
                   <input
                     type="text"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 sm:py-3 px-3 sm:px-4 text-[13px] sm:text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/20 transition-all outline-none shadow-sm"
                     value={formulario.respuesta_correcta}
                     onChange={(e) => setFormulario({ ...formulario, respuesta_correcta: e.target.value })}
                     placeholder={formulario.tipo === 'cuestionario' ? 'Ej. A' : 'Escribe la respuesta correcta'}
@@ -925,18 +1023,18 @@ export default function EstudioPage() {
                 )}
               </div>
 
-              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3 border-t border-gray-100 pt-6">
+              <div className="mt-4 sm:mt-6 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-gray-100 pt-5 sm:pt-6">
                 <button 
                   type="button" 
                   onClick={() => setModalAbierto(false)} 
-                  className="rounded-xl px-6 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors w-full sm:w-auto" 
+                  className="rounded-xl px-5 sm:px-6 py-2.5 sm:py-3 text-[13px] sm:text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors w-full sm:w-auto" 
                   disabled={guardando}
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit" 
-                  className="rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-6 py-3 text-sm font-bold text-white shadow-md hover:shadow-lg transition-all w-full sm:w-auto disabled:opacity-50" 
+                  className="rounded-xl bg-gradient-to-r from-brand-orange to-[#f97316] px-5 sm:px-6 py-2.5 sm:py-3 text-[13px] sm:text-sm font-bold text-white shadow-md hover:shadow-lg transition-all w-full sm:w-auto disabled:opacity-50" 
                   disabled={guardando}
                 >
                   {guardando ? 'Guardando...' : 'Guardar Pregunta'}
@@ -975,28 +1073,28 @@ export default function EstudioPage() {
 
       {!sesionExpirada && usuarioSeleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl overflow-hidden">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl sm:rounded-3xl bg-white shadow-2xl overflow-hidden">
             
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-8 bg-white z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 p-5 sm:p-8 bg-white z-10">
               <div>
-                <h2 className="text-2xl font-extrabold text-gray-900 mb-1">{usuarioSeleccionado.nombre}</h2>
-                <p className="text-sm font-medium text-gray-500">{usuarioSeleccionado.departamento} · {usuarioSeleccionado.email}</p>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-1">{usuarioSeleccionado.nombre}</h2>
+                <p className="text-[12px] sm:text-sm font-medium text-gray-500">{usuarioSeleccionado.departamento} · <span className="break-all">{usuarioSeleccionado.email}</span></p>
               </div>
-              <div className="flex items-center gap-3">
-                {/* BOTÓN DESCARGA ESPECÍFICA (POR USUARIO) */}
+              <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                {/* BOTÓN DESCARGA ESPECÍFICA (MÁS PEQUEÑO EN MÓVIL) */}
                 <button
                   onClick={() => generarExcelUsuario(usuarioSeleccionado)}
                   disabled={descargandoUsuario}
-                  className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-4 py-2 text-xs font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg sm:rounded-xl bg-brand-orange px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50"
                 >
                   {descargandoUsuario ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                       Generando...
                     </div>
                   ) : (
                     <>
-                      <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <svg className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                       </svg>
                       Descargar Historial
@@ -1005,62 +1103,62 @@ export default function EstudioPage() {
                 </button>
                 <button
                   onClick={cerrarModalUsuario}
-                  className="rounded-full p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  className="rounded-full p-1.5 sm:p-2 text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-900 transition-colors shrink-0"
                   aria-label="Cerrar"
                 >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                  <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
 
-            <div className="deinsa-scroll overflow-y-auto p-8 bg-[#f8f9fa]">
+            <div className="deinsa-scroll overflow-y-auto p-4 sm:p-8 bg-[#f8f9fa]">
               
               {intentoSeleccionado ? (
                 <div>
                   <button 
                     onClick={() => setIntentoSeleccionado(null)} 
-                    className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 mb-6 transition-colors"
+                    className="flex items-center gap-1.5 sm:gap-2 text-[13px] sm:text-sm font-bold text-gray-500 hover:text-gray-900 mb-5 sm:mb-6 transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                     Volver al historial
                   </button>
                   
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">
-                      <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 mb-5 sm:mb-6">
+                    <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-brand-orange">
+                      <span className="h-[2px] w-4 sm:w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
                       Respuestas de {formatoMetodo(intentoSeleccionado.metodo)}
                     </div>
                     {intentoSeleccionado.puntuacion !== undefined && intentoSeleccionado.puntuacion !== null && (
-                       <span className="inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-sm font-bold text-white shadow-sm">
+                       <span className="self-start sm:self-auto inline-flex items-center rounded-md bg-gray-900 px-3 py-1.5 text-[12px] sm:text-sm font-bold text-white shadow-sm">
                          Nota: {intentoSeleccionado.puntuacion} / {intentoSeleccionado.total_preguntas}
                        </span>
                     )}
                   </div>
 
                   {!intentoSeleccionado.respuestas_detalle || intentoSeleccionado.respuestas_detalle.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center">
-                      <p className="text-sm font-medium text-gray-500">No hay detalles de las respuestas guardados para este intento histórico.</p>
-                      <p className="text-xs text-gray-400 mt-1">(Los nuevos intentos registrarán cada pregunta)</p>
+                    <div className="rounded-xl sm:rounded-2xl border border-dashed border-gray-200 bg-white p-6 sm:p-8 text-center">
+                      <p className="text-[13px] sm:text-sm font-medium text-gray-500">No hay detalles de las respuestas guardados para este intento histórico.</p>
+                      <p className="text-[11px] sm:text-xs text-gray-400 mt-1">(Los nuevos intentos registrarán cada pregunta)</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
                       {intentoSeleccionado.respuestas_detalle.map((resp, idx) => (
-                        <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                          <p className="text-base font-bold text-gray-900 mb-4">{idx + 1}. {resp.pregunta}</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="rounded-xl bg-gray-50 p-4 border border-gray-100">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Respuesta del Usuario</p>
-                              <p className={`text-sm font-bold ${resp.es_correcta ? 'text-green-600' : 'text-red-500'}`}>
+                        <div key={idx} className="rounded-xl sm:rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
+                          <p className="text-[14px] sm:text-base font-bold text-gray-900 mb-3 sm:mb-4">{idx + 1}. {resp.pregunta}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <div className="rounded-lg sm:rounded-xl bg-gray-50 p-3 sm:p-4 border border-gray-100">
+                              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">Respuesta del Usuario</p>
+                              <p className={`text-[13px] sm:text-sm font-bold ${resp.es_correcta ? 'text-green-600' : 'text-red-500'}`}>
                                 {resp.respuesta_usuario || 'Sin responder'}
                               </p>
                             </div>
-                            <div className="rounded-xl bg-green-50 p-4 border border-green-100">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-green-600 mb-1">Respuesta Correcta</p>
-                              <p className="text-sm font-bold text-green-700">{resp.respuesta_correcta}</p>
+                            <div className="rounded-lg sm:rounded-xl bg-green-50 p-3 sm:p-4 border border-green-100">
+                              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-green-600 mb-1">Respuesta Correcta</p>
+                              <p className="text-[13px] sm:text-sm font-bold text-green-700">{resp.respuesta_correcta}</p>
                             </div>
                           </div>
                         </div>
@@ -1070,12 +1168,51 @@ export default function EstudioPage() {
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-6">
-                    <span className="h-[2px] w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
+                  <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 mb-4 sm:mb-6">
+                    <span className="h-[2px] w-4 sm:w-6 shrink-0 rounded-full bg-gradient-to-r from-brand-orange to-brand-orange/40" />
                     Historial de Sesiones
                   </div>
                   
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                  {/* AJUSTE RESPONSIVE: VISTA MÓVIL EN TARJETAS PARA EL MODAL HISTORIAL */}
+                  <div className="md:hidden flex flex-col gap-3">
+                    {ordenarIntentos(usuarioSeleccionado.intentos).map((intento) => (
+                      <div key={intento.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col gap-2.5">
+                         <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Método Evaluado</span>
+                           <span className="inline-flex items-center rounded-md px-2.5 py-1 text-[10px] font-bold border shadow-sm border-brand-orange/20 bg-brand-orange/10 text-brand-orange">
+                             {formatoMetodo(intento.metodo)}
+                           </span>
+                         </div>
+                         <div className="flex justify-between items-center pt-1">
+                           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Puntuación Final</span>
+                           {intento.puntuacion !== undefined && intento.puntuacion !== null ? (
+                              <span className="font-black text-gray-900 text-[13px]">
+                                {intento.puntuacion} <span className="text-[10px] font-bold text-gray-400">/ {intento.total_preguntas}</span>
+                              </span>
+                           ) : (
+                              <span className="text-gray-400 font-medium italic text-[11px]">Repaso libre</span>
+                           )}
+                         </div>
+                         <div className="flex justify-between items-center">
+                           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Fecha y Hora</span>
+                           <span className="text-[11px] font-medium text-gray-500">
+                             {formatoFecha.format(new Date(intento.fecha_completado))}
+                           </span>
+                         </div>
+                         <div className="mt-1 pt-3 border-t border-gray-50 text-right">
+                           <button 
+                             onClick={() => setIntentoSeleccionado(intento)}
+                             className="text-[11px] uppercase tracking-wider font-bold text-brand-orange hover:text-orange-700 w-full text-center"
+                           >
+                             Ver respuestas
+                           </button>
+                         </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* VISTA ESCRITORIO: TABLA ORIGINAL INTACTA */}
+                  <div className="hidden md:block overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                     <table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-gray-100 bg-gray-50/50">

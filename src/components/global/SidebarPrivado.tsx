@@ -68,7 +68,6 @@ const ENLACES = [
     label: 'Aprendizaje IA',
     icono: (
       <svg {...ICON_PROPS}>
-        {/* Ícono de foco/idea para nuevos conocimientos */}
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.829 1.58-2.083a4.501 4.501 0 10-7.66 0c.922.254 1.58 1.1 1.58 2.083v.192" />
       </svg>
     ),
@@ -78,7 +77,6 @@ const ENLACES = [
     label: 'Auditoría',
     icono: (
       <svg {...ICON_PROPS}>
-        {/* Ícono de portapapeles con escudo/checklist para auditoría */}
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
       </svg>
     ),
@@ -183,9 +181,14 @@ export default function SidebarPrivado() {
             )}
           </div>
 
+          {/* AJUSTE RESPONSIVE: Botón hamburguesa animado igual al público */}
           <button
             type="button"
-            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
+            className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-brand-orange/20 md:hidden ${
+              navMobileAbierto 
+                ? "bg-brand-orange/10 text-brand-orange" 
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            }`}
             aria-expanded={navMobileAbierto}
             onClick={() => {
               setNavMobileAbierto(!navMobileAbierto);
@@ -193,16 +196,25 @@ export default function SidebarPrivado() {
             }}
           >
             <span className="sr-only">Abrir menú principal</span>
-            <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 17 14">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15" />
-            </svg>
+            {navMobileAbierto ? (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 17 14">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
 
+      {/* AJUSTE RESPONSIVE: Transición suave de max-height igual al Navbar público */}
       <nav 
         aria-label="Navegación de Capital Humano" 
-        className={`${navMobileAbierto ? 'block' : 'hidden'} md:block w-full md:flex-1 overflow-y-auto bg-white relative z-10 border-b md:border-b-0 border-gray-100`}
+        className={`md:block w-full md:flex-1 bg-white relative z-10 border-b md:border-b-0 border-gray-100 transition-all duration-300 ease-in-out overflow-hidden md:overflow-y-auto ${
+          navMobileAbierto ? "max-h-screen opacity-100" : "max-h-0 opacity-0 md:max-h-none md:opacity-100"
+        }`}
       >
         <ul className="flex flex-col gap-1 p-4 md:gap-2 md:p-5">
           {ENLACES.map((enlace) => {
@@ -212,6 +224,7 @@ export default function SidebarPrivado() {
                 <Link
                   href={enlace.href}
                   aria-current={activo ? 'page' : undefined}
+                  onClick={() => setNavMobileAbierto(false)}
                   className={`flex items-center gap-3.5 whitespace-nowrap rounded-xl px-4 py-3 text-base font-medium transition-colors ${
                     activo
                       ? 'bg-brand-orange/10 text-brand-orange font-bold'
