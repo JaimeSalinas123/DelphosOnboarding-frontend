@@ -9,6 +9,27 @@ import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 import { BRAND_ORANGE } from '@/lib/theme';
 
+// ============================================================================
+// 🚀 OPTIMIZACIÓN EXTREMA DE MEMORIA (INSTANCING)
+// Al definir las geometrías y materiales estáticos FUERA del componente, 
+// evitamos que Three.js cree 8 copias idénticas en la memoria de la tarjeta 
+// gráfica (GPU). Todos los nodos reciclarán la misma geometría.
+// ============================================================================
+const R = 0.92;
+const geomGlow = new THREE.CircleGeometry(R * 1.7, 48);
+const geomRing = new THREE.RingGeometry(R * 1.02, R * 1.14, 64);
+const geomBase = new THREE.CircleGeometry(R, 64);
+const geomPlane = new THREE.PlaneGeometry(R * 1.5, R * 1.5);
+const geomBadgeOut = new THREE.CircleGeometry(0.17, 24);
+const geomBadgeIn = new THREE.CircleGeometry(0.1, 24);
+
+const matBase = new THREE.MeshStandardMaterial({
+  color: '#171717',
+  metalness: 0.25,
+  roughness: 0.45,
+});
+const matBadgeOut = new THREE.MeshBasicMaterial({ color: '#FFFFFF', toneMapped: false });
+
 interface NodoModuloProps {
   modulo: Modulo;
   radius: number;
@@ -54,7 +75,6 @@ export default function NodoModulo({
   const anySelected = selectedId !== null;
   const isDimmed = anySelected && !isSelected;
 
-  // Acento unificado: al pasar el mouse o seleccionar, siempre naranja de marca.
   const color = useMemo(() => new THREE.Color(BRAND_ORANGE), []);
 
   const position = useMemo<[number, number, number]>(
@@ -99,7 +119,6 @@ export default function NodoModulo({
     }
 
     if (glowRef.current && glowMatRef.current) {
-      // El aura solo aparece en hover puro; se apaga al seleccionar.
       const hoverOnly = isHovered && !isSelected;
       const pulse = reducedMotion ? 1 : 1 + Math.sin(t * 4 + phase) * 0.04;
       const gTarget = hoverOnly ? 1.05 * pulse : 0.0001;
@@ -147,14 +166,11 @@ export default function NodoModulo({
     toggleSelect(modulo.id);
   };
 
-  const R = 0.92;
-
   return (
     <group ref={outerRef} position={position}>
       <Billboard>
         <group ref={coinRef}>
-          <mesh ref={glowRef} position={[0, 0, -0.05]} scale={0.0001}>
-            <circleGeometry args={[R * 1.7, 48]} />
+          <mesh ref={glowRef} geometry={geomGlow} position={[0, 0, -0.05]} scale={0.0001}>
             <meshBasicMaterial
               ref={glowMatRef}
               color={color}
@@ -166,8 +182,7 @@ export default function NodoModulo({
             />
           </mesh>
 
-          <mesh ref={ringRef} position={[0, 0, -0.02]}>
-            <ringGeometry args={[R * 1.02, R * 1.14, 64]} />
+          <mesh ref={ringRef} geometry={geomRing} position={[0, 0, -0.02]}>
             <meshBasicMaterial
               ref={ringMatRef}
               color={color}
@@ -178,17 +193,9 @@ export default function NodoModulo({
             />
           </mesh>
 
-          <mesh onPointerOver={over} onPointerOut={out} onClick={click}>
-            <circleGeometry args={[R, 64]} />
-            <meshStandardMaterial
-              color="#171717"
-              metalness={0.25}
-              roughness={0.45}
-            />
-          </mesh>
+          <mesh geometry={geomBase} material={matBase} onPointerOver={over} onPointerOut={out} onClick={click} />
 
-          <mesh position={[0, 0, 0.01]} raycast={() => null}>
-            <planeGeometry args={[R * 1.5, R * 1.5]} />
+          <mesh geometry={geomPlane} position={[0, 0, 0.01]} raycast={() => null}>
             <meshBasicMaterial
               ref={logoMatRef}
               map={texture}
@@ -197,14 +204,9 @@ export default function NodoModulo({
             />
           </mesh>
 
-          {/* Insignia de "ya visitado": aparece una vez que el usuario abrió este módulo. */}
           <group ref={badgeRef} position={[R * 0.74, R * 0.74, 0.04]} scale={0.0001}>
-            <mesh raycast={() => null}>
-              <circleGeometry args={[0.17, 24]} />
-              <meshBasicMaterial color="#FFFFFF" toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0, 0.001]} raycast={() => null}>
-              <circleGeometry args={[0.1, 24]} />
+            <mesh geometry={geomBadgeOut} material={matBadgeOut} raycast={() => null} />
+            <mesh geometry={geomBadgeIn} position={[0, 0, 0.001]} raycast={() => null}>
               <meshBasicMaterial color={color} toneMapped={false} />
             </mesh>
           </group>
@@ -219,7 +221,7 @@ export default function NodoModulo({
             zIndexRange={[20, 0]}
           >
             <div
-              className="whitespace-nowrap rounded-full px-3 py-1 text-[13px] font-medium text-white shadow-md"
+              className="whitespace-nowrap rounded-full px-3 sm:px-4 py-1 sm:py-1.5 text-[11px] sm:text-[13px] font-medium text-white shadow-md"
               style={{ backgroundColor: BRAND_ORANGE }}
             >
               {modulo.nombre}

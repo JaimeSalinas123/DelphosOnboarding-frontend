@@ -7,12 +7,6 @@ import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { BRAND_ORANGE, hexToRgba } from '@/lib/theme';
 
-// Punto aproximado (en % de la vista) donde termina el nodo seleccionado. En
-// desktop el anillo se desplaza a la izquierda (deja aire a la tarjeta), así
-// que el spotlight se ancla ahí; en mobile el anillo casi no se mueve
-// (la tarjeta es un bottom sheet, no compite por ancho), así que se ancla
-// al centro. El spotlight, la ola de revelado y la silueta del ícono se
-// anclan todos al mismo punto, sin necesitar proyección 3D→2D en tiempo real.
 const SPOT_DESKTOP = { x: '36%', y: '56%' };
 const SPOT_MOBILE = { x: '50%', y: '46%' };
 
@@ -24,13 +18,6 @@ const GRADIENTE_SELECCION =
 const NOISE_URL =
   "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\")";
 
-/**
- * Fondo por capas de la vista Ecosistema Delphos. Vive detrás del Canvas
- * (que ahora es transparente) y reacciona a qué módulo está seleccionado:
- * degradado base, spotlight con ola de revelado, silueta difusa del ícono,
- * extensión de vidrio esmerilado detrás del panel y grano sutil. Todo
- * puramente decorativo (pointer-events-none).
- */
 export default function FondoEcosistema() {
   const selectedId = useEcosistemaStore((s) => s.selectedId);
   const modulo = getModuloById(selectedId);
@@ -42,14 +29,12 @@ export default function FondoEcosistema() {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      {/* 1. Degradado base (idea "horizonte"): siempre presente, se calienta al seleccionar. */}
       <motion.div
         className="absolute inset-0"
         animate={{ background: modulo ? GRADIENTE_SELECCION : GRADIENTE_IDLE }}
         transition={{ duration: 0.9, ease: 'easeInOut' }}
       />
 
-      {/* 2. Spotlight radial + ola de revelado (clip-path), se re-dispara con cada módulo. */}
       <AnimatePresence>
         {modulo && (
           <motion.div
@@ -72,7 +57,6 @@ export default function FondoEcosistema() {
         )}
       </AnimatePresence>
 
-      {/* 3. Silueta difusa, enorme, del ícono del módulo seleccionado. */}
       <AnimatePresence>
         {modulo && (
           <motion.div
@@ -83,7 +67,7 @@ export default function FondoEcosistema() {
               top: spot.y,
               width: siluetaSize,
               height: siluetaSize,
-              filter: `blur(${isDesktop ? 70 : 42}px)`,
+              filter: `blur(${isDesktop ? 70 : 30}px)`, // Blur reducido en móvil para salvar batería GPU
             }}
             initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 0.18, scale: 1 }}
@@ -95,14 +79,14 @@ export default function FondoEcosistema() {
               alt=""
               fill
               style={{ objectFit: 'contain' }}
+              priority // Añadido para asegurar carga rápida en la animación
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 4. Extensión de vidrio esmerilado detrás del panel (solo desktop). */}
       <motion.div
-        className="absolute inset-y-0 right-0 hidden w-[42%] md:block"
+        className="absolute inset-y-0 right-0 hidden w-[42%] md:block will-change-transform"
         animate={{
           opacity: modulo ? 1 : 0,
           backdropFilter: modulo ? 'blur(40px)' : 'blur(0px)',
@@ -110,9 +94,8 @@ export default function FondoEcosistema() {
         transition={{ duration: 0.6, ease: 'easeInOut' }}
       />
 
-      {/* 5. Grano sutil, siempre presente, un poco más marcado al seleccionar. */}
       <motion.div
-        className="absolute inset-0 mix-blend-overlay"
+        className="absolute inset-0 mix-blend-overlay will-change-opacity"
         style={{ backgroundImage: NOISE_URL }}
         animate={{ opacity: modulo ? 0.05 : 0.025 }}
         transition={{ duration: 0.9 }}

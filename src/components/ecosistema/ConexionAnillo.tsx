@@ -13,10 +13,6 @@ interface ConexionAnilloProps {
 
 const BASE = new THREE.Color(BRAND_ORANGE);
 
-/**
- * Anillo base naranja de marca (sobre blanco) que conecta los módulos.
- * Se intensifica un poco al pasar el mouse o seleccionar algo.
- */
 export default function ConexionAnillo({ radius }: ConexionAnilloProps) {
   const baseMatRef = useRef<THREE.MeshStandardMaterial>(null);
 
