@@ -7,22 +7,13 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import CirculoVirtuoso from './CirculoVirtuoso';
 import { useEcosistemaStore } from '@/lib/useEcosistemaStore';
-import { BRAND_ORANGE } from '@/lib/theme';
 
 interface EcosistemaSceneProps {
   reducedMotion: boolean;
   lowPower: boolean;
-  /** true en viewports md+ (panel lateral); en mobile el panel es un bottom sheet. */
   isDesktop: boolean;
 }
 
-/**
- * Parallax sutil siguiendo el mouse. Se aplica sobre un grupo contenedor
- * para no pelear con OrbitControls. Sin dolly-in (la cámara nunca "se
- * acerca"), pero sí se achica un poco al seleccionar, junto con el
- * desplazamiento a la izquierda, para que la tarjeta de info (ahora más
- * ancha) no quede pegada al anillo.
- */
 function SceneRig({
   reducedMotion,
   isDesktop,
@@ -48,7 +39,6 @@ function SceneRig({
     const targetScale = selectedId ? (isDesktop ? 0.82 : 0.9) : 1;
     g.scale.setScalar(THREE.MathUtils.damp(g.scale.x, targetScale, 4.5, delta));
 
-    // Parallax sutil (sin dolly: la cámara nunca "se acerca").
     const rx = reducedMotion ? 0.18 : 0.18 - pointer.y * 0.28;
     const ry = reducedMotion ? 0 : pointer.x * 0.34;
     g.rotation.x = THREE.MathUtils.damp(g.rotation.x, rx, 3.7, delta);
@@ -61,17 +51,8 @@ function SceneRig({
 const BASE_FOV = 42;
 const BASE_DISTANCE = 10.5;
 const BASE_ELEVATION_RATIO = 2.9 / 10.5;
-// Ancho de mundo que necesitamos ver horizontalmente para que el anillo
-// (radio 3.2, con nodos y glow hasta ~3.65) no quede recortado por los
-// costados en pantallas angostas (celulares en vertical).
 const TARGET_HALF_WIDTH = 4.2;
 
-/**
- * Ajusta FOV y distancia de la cámara según el aspect ratio real del
- * viewport (no un breakpoint fijo), para que el anillo entre completo tanto
- * en pantallas anchas como angostas, incluida rotación de pantalla en vivo.
- * En pantallas anchas se comporta igual que antes (FOV/distancia base).
- */
 function CamaraResponsiva() {
   const { camera, size } = useThree();
 
@@ -99,7 +80,6 @@ function CamaraResponsiva() {
       persp.position.z = distance;
       persp.position.y = distance * BASE_ELEVATION_RATIO;
     }
-
     persp.updateProjectionMatrix();
   }, [camera, size]);
 
@@ -107,17 +87,8 @@ function CamaraResponsiva() {
 }
 
 const PARTICLE_COUNT = 160;
-// Punto aproximado donde termina el nodo seleccionado en pantalla (dado el
-// desplazamiento a la izquierda de SceneRig + la rotación al frente del
-// anillo). El polvo ambiental converge suavemente hacia ahí al seleccionar.
 const ATTRACT_POINT = new THREE.Vector3(-1.8, 0.5, 2.6);
 
-/**
- * Polvo ambiental disperso alrededor del anillo: le da profundidad al fondo
- * sin competir con los nodos. Al seleccionar un módulo, las partículas se
- * dejan atraer levemente hacia él en vez de quedarse quietas. Se omite en
- * dispositivos de bajo rendimiento.
- */
 function PolvoAmbiental({ reducedMotion }: { reducedMotion: boolean }) {
   const pointsRef = useRef<THREE.Points>(null);
   const selectedId = useEcosistemaStore((s) => s.selectedId);
@@ -155,39 +126,13 @@ function PolvoAmbiental({ reducedMotion }: { reducedMotion: boolean }) {
       const ix = i * 3;
       const iy = ix + 1;
       const iz = ix + 2;
-      const targetX = THREE.MathUtils.lerp(
-        homePositions[ix],
-        ATTRACT_POINT.x,
-        pull
-      );
-      const targetY = THREE.MathUtils.lerp(
-        homePositions[iy],
-        ATTRACT_POINT.y,
-        pull
-      );
-      const targetZ = THREE.MathUtils.lerp(
-        homePositions[iz],
-        ATTRACT_POINT.z,
-        pull
-      );
-      livePositions[ix] = THREE.MathUtils.damp(
-        livePositions[ix],
-        targetX,
-        2,
-        delta
-      );
-      livePositions[iy] = THREE.MathUtils.damp(
-        livePositions[iy],
-        targetY,
-        2,
-        delta
-      );
-      livePositions[iz] = THREE.MathUtils.damp(
-        livePositions[iz],
-        targetZ,
-        2,
-        delta
-      );
+      const targetX = THREE.MathUtils.lerp(homePositions[ix], ATTRACT_POINT.x, pull);
+      const targetY = THREE.MathUtils.lerp(homePositions[iy], ATTRACT_POINT.y, pull);
+      const targetZ = THREE.MathUtils.lerp(homePositions[iz], ATTRACT_POINT.z, pull);
+      
+      livePositions[ix] = THREE.MathUtils.damp(livePositions[ix], targetX, 2, delta);
+      livePositions[iy] = THREE.MathUtils.damp(livePositions[iy], targetY, 2, delta);
+      livePositions[iz] = THREE.MathUtils.damp(livePositions[iz], targetZ, 2, delta);
     }
     posAttr.needsUpdate = true;
   });
@@ -198,7 +143,7 @@ function PolvoAmbiental({ reducedMotion }: { reducedMotion: boolean }) {
         <bufferAttribute attach="attributes-position" args={[livePositions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        color={BRAND_ORANGE}
+        color="#d85a30"
         size={0.045}
         transparent
         opacity={0.4}
@@ -211,19 +156,22 @@ function PolvoAmbiental({ reducedMotion }: { reducedMotion: boolean }) {
   );
 }
 
+// OPTIMIZACIÓN: Extraer geometría masiva de plano
+const backgroundPlaneGeo = new THREE.PlaneGeometry(120, 120);
+const backgroundPlaneMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+
 function BackgroundDeselect() {
   const deselect = useEcosistemaStore((s) => s.deselect);
   return (
     <mesh
+      geometry={backgroundPlaneGeo}
+      material={backgroundPlaneMat}
       position={[0, 0, -8]}
       onClick={(e) => {
         e.stopPropagation();
         deselect();
       }}
-    >
-      <planeGeometry args={[120, 120]} />
-      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-    </mesh>
+    />
   );
 }
 
@@ -247,12 +195,8 @@ export default function EcosistemaScene({
       camera={{ position: [0, 2.9, 10.5], fov: 42 }}
       gl={{ antialias: !lowPower, alpha: true }}
     >
-      {/* Sin fondo propio: deja ver el fondo CSS (FondoEcosistema) detrás del
-          canvas transparente. Ya no hay ContactShadows ni otro plano opaco
-          que pudiera quedar expuesto por esto. */}
       <CamaraResponsiva />
 
-      {/* Iluminación de estudio (brillante, funciona igual sobre el fondo claro) */}
       <ambientLight intensity={0.9} />
       <directionalLight position={[5, 9, 6]} intensity={1.1} />
       <directionalLight position={[-6, 4, 3]} intensity={0.5} />
@@ -289,7 +233,6 @@ export default function EcosistemaScene({
         onEnd={() => setUserInteracting(false)}
         makeDefault
       />
-
       <AdaptiveDpr pixelated />
     </Canvas>
   );

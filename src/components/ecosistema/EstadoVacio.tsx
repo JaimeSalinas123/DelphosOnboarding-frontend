@@ -2,7 +2,6 @@
 
 import { motion } from 'framer-motion';
 
-/** Invitación discreta cuando no hay módulo seleccionado. */
 export default function EstadoVacio() {
   return (
     <motion.div
@@ -18,15 +17,15 @@ export default function EstadoVacio() {
           <span className="absolute inline-flex h-full w-full animate-invite rounded-full bg-brand-orange opacity-75" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-brand-orange" />
         </span>
-        <p className="text-xs font-medium tracking-wide text-slate-700 sm:text-sm">
+        <p className="text-[11px] font-medium tracking-wide text-slate-700 sm:text-sm">
           Selecciona un módulo para explorarlo
         </p>
       </div>
-      <p className="mt-2 hidden text-xs text-slate-400 sm:block">
+      <p className="mt-2 hidden text-xs text-slate-400 md:block">
         Click en un nodo · flechas ← → para navegar · Esc para volver
       </p>
-      <p className="mt-2 text-[11px] text-slate-400 sm:hidden">
-        Tocá un nodo para explorarlo
+      <p className="mt-2 text-[10px] text-slate-400 md:hidden">
+        Toca un nodo para explorarlo
       </p>
     </motion.div>
   );

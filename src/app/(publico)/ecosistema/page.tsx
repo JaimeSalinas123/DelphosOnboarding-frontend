@@ -10,7 +10,6 @@ import PanelInfoModulo from '@/components/ecosistema/PanelInfoModulo';
 import EstadoVacio from '@/components/ecosistema/EstadoVacio';
 import FondoEcosistema from '@/components/ecosistema/FondoEcosistema';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import SessionExpired from '@/components/global/SessionExpired';
 
 const EcosistemaScene = dynamic(
   () => import('@/components/ecosistema/EcosistemaScene'),
@@ -23,7 +22,7 @@ function Loader() {
       <div className="h-1 w-40 overflow-hidden rounded-full bg-slate-100">
         <div className="h-full w-1/3 animate-loaderPulse rounded-full bg-brand-orange" />
       </div>
-      <p className="mt-4 text-xs uppercase tracking-[0.3em] text-slate-400">
+      <p className="mt-4 text-[10px] sm:text-xs uppercase tracking-[0.3em] text-slate-400">
         Cargando ecosistema
       </p>
     </div>
@@ -126,22 +125,23 @@ export default function EcosistemaPage() {
   const seleccionadoNombre = seleccionadoModulo?.nombre ?? 'ninguno';
 
   return (
-    <main className="fixed top-0 left-0 z-0 h-screen w-screen overflow-hidden bg-[#f8f9fa]">
+    <main className="fixed top-0 left-0 z-0 h-[100dvh] w-screen overflow-hidden bg-[#f8f9fa]">
       <FondoEcosistema />
 
-      <header className="pointer-events-none absolute left-0 top-[72px] z-10 max-w-[80vw] p-4 sm:p-5 md:p-7">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-slate-400 sm:text-[11px] sm:tracking-[0.35em]">
+      {/* HEADER ADAPTATIVO: Ajuste de márgenes y tamaños de fuente según dispositivo */}
+      <header className="pointer-events-none absolute left-0 top-[60px] sm:top-[72px] md:top-[80px] z-10 w-full max-w-full sm:max-w-[80vw] md:max-w-[60vw] p-4 sm:p-6 md:p-8 lg:p-10">
+        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 sm:text-[10px] md:text-[11px] sm:tracking-[0.35em]">
           DEINSA Global
         </p>
-        <h1 className="mt-1 text-xs font-semibold tracking-wide text-slate-800 sm:text-sm">
+        <h1 className="mt-1 text-sm font-extrabold tracking-tight text-slate-800 sm:text-base md:text-lg">
           Ecosistema Delphos
-          <span className="ml-2 hidden font-normal text-slate-400 sm:inline">
+          <span className="ml-1.5 hidden font-medium text-slate-400 sm:inline">
             · Círculo Virtuoso
           </span>
         </h1>
 
-        <div className="mt-3 flex items-center gap-2">
-          <div className="h-1 w-16 overflow-hidden rounded-full bg-slate-900/10 sm:w-24">
+        <div className="mt-3 sm:mt-4 flex items-center gap-2 sm:gap-3">
+          <div className="h-1 sm:h-1.5 w-16 overflow-hidden rounded-full bg-slate-900/10 sm:w-24 md:w-32">
             <div
               className="h-full rounded-full bg-brand-orange transition-[width] duration-500 ease-out"
               style={{
@@ -149,18 +149,20 @@ export default function EcosistemaPage() {
               }}
             />
           </div>
-          <p className="text-[10px] font-medium tabular-nums text-slate-400 sm:text-[11px]">
-            {visitedIds.length}/{modulos.length} explorados
+          <p className="text-[9px] sm:text-[10px] md:text-[11px] font-bold tabular-nums text-slate-400">
+            {visitedIds.length}/{modulos.length} <span className="hidden sm:inline">explorados</span>
           </p>
         </div>
 
-        <AnimatePresence mode="wait">
-          {!selectedId && <EstadoVacio key="vacio" />}
-        </AnimatePresence>
+        <div className="mt-2 sm:mt-4">
+          <AnimatePresence mode="wait">
+            {!selectedId && <EstadoVacio key="vacio" />}
+          </AnimatePresence>
+        </div>
       </header>
 
-      {/* Se añadió `translate-x-12 sm:translate-x-16` para desplazar el 3D hacia la derecha y centrarlo */}
-      <div className="absolute inset-0 z-[1] translate-x-12 sm:translate-x-16">
+      {/* ESCENA 3D: translate-x-0 en celular (centrado perfecto), se desplaza a la derecha progresivamente en pantallas más grandes */}
+      <div className="absolute inset-0 z-[1] translate-x-0 sm:translate-x-8 md:translate-x-12 lg:translate-x-16">
         {mounted ? (
           <Suspense fallback={<Loader />}>
             <EcosistemaScene
