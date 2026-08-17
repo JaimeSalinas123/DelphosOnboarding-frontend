@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 // Tiempo máximo de espera para evitar solicitudes colgadas indefinidamente.
 export const REQUEST_TIMEOUT_MS = 15000;
@@ -38,7 +38,8 @@ export const handleResponse = async (response: Response) => {
       data = JSON.parse(textBody);
       isJson = true;
     }
-  } catch (e) {
+  // SOLUCIÓN ESLINT 2: Quitamos la 'e' porque no la usamos
+  } catch { 
     isJson = false;
   }
 
@@ -101,8 +102,9 @@ export const authService = {
     return null;
   },
 
+  // SOLUCIÓN ESLINT 1: Cambiamos 'any' por 'Record<string, unknown>'
   // Función para actualizar los datos locales del usuario
-  updateCurrentUser: (newData: any) => {
+  updateCurrentUser: (newData: Record<string, unknown>) => {
     if (typeof window !== 'undefined') {
       const current = authService.getCurrentUser();
       if (current) {

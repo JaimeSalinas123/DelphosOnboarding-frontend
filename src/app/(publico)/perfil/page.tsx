@@ -3,11 +3,44 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/context/AuthContext';
 import { useProgresoStore } from '@/lib/useProgresoStore';
 import type { ProgresoPasante } from '@/services/progresoService';
 import { etiquetaRol } from '@/lib/roles';
+import { INSIGNIAS, insigniaDesbloqueada } from '@/lib/insignias';
+import InsigniaMedalla from '@/components/global/InsigniaMedalla';
+
+// =======================================================================
+// 🚀 OPTIMIZACIÓN EXTREMA: Lazy Loading de Recharts
+// Evita descargar todo el motor de gráficos hasta que la página ya esté visible.
+// =======================================================================
+const GraficoProgreso = dynamic(
+  () => import('recharts').then((recharts) => {
+    const { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } = recharts;
+    return function Grafico({ valor }: { valor: number }) {
+      return (
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart
+            innerRadius="72%"
+            outerRadius="100%"
+            data={[{ value: valor }]}
+            startAngle={90}
+            endAngle={-270}
+          >
+            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+            <RadialBar dataKey="value" cornerRadius={20} fill="var(--brand-orange)" background={{ fill: 'var(--neutral-secondary)' }} />
+          </RadialBarChart>
+        </ResponsiveContainer>
+      );
+    };
+  }),
+  { 
+    ssr: false, 
+    // Muestra un esqueleto suave mientras se carga la gráfica en segundo plano
+    loading: () => <div className="h-full w-full animate-pulse rounded-full bg-neutral-secondary"></div> 
+  }
+);
 
 function iniciales(nombre: string) {
   const partes = nombre.trim().split(/\s+/);
@@ -50,7 +83,7 @@ export default function PerfilPage() {
   };
 
   return (
-    <div className="w-full flex-1 bg-neutral-secondary/40">
+    <div className="w-full flex-1 bg-white">
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         {/* HERO */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-black via-brand-black to-brand-orange p-8 shadow-sm sm:p-10">
@@ -108,7 +141,7 @@ export default function PerfilPage() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
+                      d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125-.504 1.125 1.125V21"
                     />
                   </svg>
                 </span>
@@ -159,19 +192,10 @@ export default function PerfilPage() {
                 </div>
               ) : (
                 <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row">
+                  
+                  {/* Reemplazamos la importación directa por nuestro componente Optimizado */}
                   <div className="relative h-36 w-36 flex-shrink-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadialBarChart
-                        innerRadius="72%"
-                        outerRadius="100%"
-                        data={[{ value: Math.min(100, progreso.porcentaje_total) }]}
-                        startAngle={90}
-                        endAngle={-270}
-                      >
-                        <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                        <RadialBar dataKey="value" cornerRadius={20} fill="var(--brand-orange)" background={{ fill: 'var(--neutral-secondary)' }} />
-                      </RadialBarChart>
-                    </ResponsiveContainer>
+                    <GraficoProgreso valor={Math.min(100, progreso.porcentaje_total)} />
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-heading">
                         {Math.round(progreso.porcentaje_total)}%
@@ -237,6 +261,56 @@ export default function PerfilPage() {
             </section>
           )}
         </div>
+
+        {/* INSIGNIAS (solo pasantes): se desbloquean solas al llegar a 100% en cada etapa. */}
+        {esPasante && progresoCargado && (
+          <section className="mt-6 rounded-3xl border border-default bg-neutral-primary p-6 shadow-sm sm:p-7">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-brand-gray">Insignias</h2>
+            <p className="mt-1 text-xs text-body">
+              Se desbloquean automáticamente al completar cada etapa del onboarding.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {INSIGNIAS.map((insignia) => {
+                const valor = insignia.clave ? progreso[insignia.clave] : 100;
+                const desbloqueada = insigniaDesbloqueada(insignia, progreso);
+                return (
+                  <div
+                    key={insignia.id}
+                    className={`relative flex flex-col items-center gap-3 rounded-2xl border p-5 text-center transition-all ${
+                      desbloqueada
+                        ? 'border-brand-orange/30 bg-brand-orange/5 shadow-sm'
+                        : 'border-default bg-neutral-secondary/40'
+                    }`}
+                  >
+                    <InsigniaMedalla desbloqueada={desbloqueada} tamano={72} />
+
+                    <div>
+                      <p className={`text-sm font-bold ${desbloqueada ? 'text-heading' : 'text-brand-gray'}`}>
+                        {insignia.nombre}
+                      </p>
+                      <p className="mt-1 text-xs text-body">{insignia.descripcion}</p>
+                    </div>
+
+                    {!desbloqueada && (
+                      <div className="mt-1 w-full">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-tertiary">
+                          <div
+                            className="h-full rounded-full bg-brand-orange/60 transition-all"
+                            style={{ width: `${Math.min(100, valor)}%` }}
+                          />
+                        </div>
+                        <p className="mt-1.5 text-[10px] font-medium text-brand-gray">
+                          {Math.round(valor)}% completado
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

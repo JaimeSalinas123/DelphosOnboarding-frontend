@@ -14,10 +14,6 @@ import Paginador from '@/components/global/Paginador';
 import SessionExpired from '@/components/global/SessionExpired';
 import SelectorDepartamento from '@/components/global/SelectorDepartamento';
 
-// IMPORTAMOS LAS LIBRERÍAS DE EXCEL
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-
 const USUARIOS_POR_PAGINA = 10;
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -306,14 +302,15 @@ export default function UsuariosPage() {
   };
 
   // ==========================================
-  // FUNCIÓN PARA GENERAR UN EXCEL PREMIUM
+  // 🚀 LAZY LOADING EXCEL PREMIUM (PERFORMANCE)
   // ==========================================
   const generarExcel = async () => {
     try {
       setDescargandoExcel(true);
       
-      // Hacemos una llamada directa para traer ABSOLUTAMENTE TODOS los usuarios (sin paginación)
-      // Así el reporte no se queda solo con los 10 de la página actual.
+      const ExcelJS = (await import('exceljs')).default;
+      const { saveAs } = await import('file-saver');
+
       const [todosLosUsuarios, todoElProgreso] = await Promise.all([
         usuarioService.listarTodos(),
         progresoService.listarTodoAdmin()
@@ -337,11 +334,9 @@ export default function UsuariosPage() {
         { header: '', key: 'tot', width: 18 }
       ];
 
-      // ESTILOS PREMIUM
       const colorNaranja = 'FFD85A30'; 
       const colorOscuro = 'FF1F2937';  
 
-      // Título principal gigante
       const mainTitle = sheet.addRow(['DIRECTORIO DE USUARIOS Y PROGRESO FORMATIVO']);
       sheet.mergeCells('A1:H1');
       mainTitle.height = 40;
@@ -353,22 +348,19 @@ export default function UsuariosPage() {
       subTitle.getCell(1).font = { name: 'Calibri', size: 11, italic: true, color: { argb: 'FF6B7280' } };
       subTitle.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
 
-      sheet.addRow([]); // Espacio
+      sheet.addRow([]); 
 
-      // Cabeceras de tabla
       const headers = ['Nombre Completo', 'Correo Electrónico', 'Departamento', 'Rol y Accesos', 'Progreso Ecosistema', 'Progreso Estudio', 'Progreso Encuestas', 'PROGRESO TOTAL'];
       const rowHeader = sheet.addRow(headers);
       rowHeader.height = 30;
       
       rowHeader.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-        // Hacemos que las cabeceras de progreso destaquen un poco diferente
         const isProgreso = colNumber >= 5;
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isProgreso ? colorOscuro : colorNaranja } };
         cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
         cell.alignment = { vertical: 'middle', horizontal: isProgreso ? 'center' : 'left' };
       });
 
-      // Filas de Datos (Cebra)
       let rowCounter = 0;
       todosLosUsuarios.forEach(u => {
         rowCounter++;
@@ -423,7 +415,7 @@ export default function UsuariosPage() {
 
   return (
     <div className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-10 xl:px-14 bg-[#f8f9fa] min-h-screen">
-      <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="mb-8 sm:mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-brand-orange mb-2">
             Gestión de Personal
@@ -431,15 +423,16 @@ export default function UsuariosPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
             Usuarios
           </h1>
-          <p className="mt-2 text-base text-gray-500">
+          <p className="mt-2 text-sm sm:text-base text-gray-500">
             Directorio y control de accesos de Delphos Onboarding.
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4">
+        {/* AJUSTE RESPONSIVE: Botones apilados y anchos en celular, alineados en PC */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full md:w-auto">
           {!cargando && !error && paginacion && (
-            <div className="flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm h-[44px]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-3">Total Registrados</span>
+            <div className="flex items-center justify-between sm:justify-start rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm h-[44px]">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-gray-400 sm:mr-3">Total Registrados</span>
               <span className="text-base font-black text-gray-900">{paginacion.total}</span>
             </div>
           )}
@@ -447,7 +440,7 @@ export default function UsuariosPage() {
           <button
             onClick={generarExcel}
             disabled={cargando || !!error || descargandoExcel}
-            className="inline-flex items-center justify-center rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50 disabled:pointer-events-none h-[44px]"
+            className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-brand-orange px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-[#d85a30] hover:scale-105 hover:shadow-lg focus:outline-none disabled:opacity-50 disabled:pointer-events-none h-[44px]"
             title="Descargar directorio completo en Excel"
           >
             {descargandoExcel ? (
@@ -467,11 +460,11 @@ export default function UsuariosPage() {
         </div>
       </header>
 
-      <section className="rounded-3xl bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
+      <section className="rounded-2xl sm:rounded-3xl bg-white p-5 sm:p-6 md:p-8 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
         <Eyebrow>Directorio</Eyebrow>
 
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-sm">
+        <div className="mb-6 sm:mb-8 flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-full sm:max-w-sm">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
               <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -486,13 +479,15 @@ export default function UsuariosPage() {
             />
           </div>
           
-          <SelectorDepartamento value={departamentoFiltro} onChange={cambiarDepartamentoFiltro} />
+          <div className="w-full sm:w-auto">
+            <SelectorDepartamento value={departamentoFiltro} onChange={cambiarDepartamentoFiltro} />
+          </div>
 
           {hayFiltrosActivos && (
             <button
               type="button"
               onClick={limpiarFiltros}
-              className="text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2"
+              className="self-start sm:self-auto text-[11px] sm:text-xs font-bold uppercase tracking-wider text-gray-400 transition-colors hover:text-brand-orange px-2 pt-1 sm:pt-0"
             >
               Limpiar filtros
             </button>
@@ -501,7 +496,7 @@ export default function UsuariosPage() {
 
         {errorFila && (
           <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-5 py-3 text-sm font-medium text-red-600 flex items-center gap-3">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             Error: {errorFila}
@@ -509,17 +504,17 @@ export default function UsuariosPage() {
         )}
 
         {cargando ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-orange/20 border-t-brand-orange" />
             <p className="text-sm font-medium text-gray-500 animate-pulse">Cargando directorio...</p>
           </div>
         ) : error ? (
           esErrorSesion ? (
-            <div className="py-12 flex justify-center">
+            <div className="py-8 sm:py-12 flex justify-center">
               <SessionExpired />
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+            <div className="flex flex-col items-center justify-center gap-4 py-16 sm:py-24 text-center px-4">
               <div className="h-12 w-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-2">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
@@ -535,13 +530,13 @@ export default function UsuariosPage() {
             </div>
           )
         ) : usuarios.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
+          <div className="flex flex-col items-center justify-center gap-2 py-16 sm:py-24 text-center px-4">
             <div className="h-16 w-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center text-gray-400">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
-            <p className="text-lg font-bold text-gray-900">
+            <p className="text-base sm:text-lg font-bold text-gray-900">
               {hayFiltrosActivos ? 'Sin coincidencias' : 'Directorio vacío'}
             </p>
             <p className="text-sm text-gray-500 max-w-sm">
@@ -551,61 +546,126 @@ export default function UsuariosPage() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nombre</th>
-                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Correo Electrónico</th>
-                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
-                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Progreso</th>
-                  <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Rol & Accesos</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {usuariosOrdenados.map((usuario) => (
-                  <tr key={usuario.id} className="transition-colors hover:bg-gray-50/50">
-                    <td className="px-4 py-5 font-bold text-gray-900">{usuario.nombre}</td>
-                    <td className="px-4 py-5 font-medium text-gray-500">{usuario.email}</td>
-                    <td className="px-4 py-5 font-medium text-gray-500">
-                      {usuario.departamento ? (
-                        <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                          {usuario.departamento}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-4 py-5">
-                      <CeldaProgreso
-                        progreso={progresoPorUsuario.get(usuario.id)}
-                        cargando={cargandoProgreso}
-                        onVerDetalle={setDetalleProgreso}
-                      />
-                    </td>
-                    <td className="px-4 py-5">
-                      {puedeEditarRoles && esRolEditable(usuario.rol) ? (
-                        <ToggleRol
-                          usuario={usuario}
-                          cargando={actualizandoId === usuario.id}
-                          esUsuarioActual={esUsuarioActual(usuario)}
-                          onCambiar={(nuevoRol) => cambiarRol(usuario, nuevoRol)}
+          <>
+            {/* ========================================================= */}
+            {/* VISTA MÓVIL: Formato de Tarjetas (Cards) para no hacer scroll horizontal */}
+            {/* ========================================================= */}
+            <div className="md:hidden flex flex-col gap-4">
+              {usuariosOrdenados.map((usuario) => (
+                <div key={usuario.id} className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-5 shadow-[0_2px_10px_rgb(0,0,0,0.02)] flex flex-col gap-4 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-brand-orange/40 rounded-l-2xl"></div>
+                  
+                  {/* Encabezado: Nombre y Email */}
+                  <div className="flex flex-col border-b border-gray-50 pb-3 pl-2">
+                    <span className="font-extrabold text-gray-900 text-[15px]">{usuario.nombre}</span>
+                    <span className="text-[13px] text-gray-500 font-medium break-all mt-0.5">{usuario.email}</span>
+                  </div>
+
+                  {/* Cuerpo: Depto y Switch */}
+                  <div className="flex flex-col gap-3.5 pl-2">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Departamento</span>
+                      <span className="font-medium text-gray-700">
+                        {usuario.departamento ? (
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                            {usuario.departamento}
+                          </span>
+                        ) : '—'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Rol & Accesos</span>
+                      <div>
+                        {puedeEditarRoles && esRolEditable(usuario.rol) ? (
+                          <ToggleRol
+                            usuario={usuario}
+                            cargando={actualizandoId === usuario.id}
+                            esUsuarioActual={esUsuarioActual(usuario)}
+                            onCambiar={(nuevoRol) => cambiarRol(usuario, nuevoRol)}
+                          />
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-3 py-1 text-[11px] font-bold text-brand-orange border border-brand-orange/20">
+                            {etiquetaRol(usuario.rol)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-sm pt-2">
+                      <span className="text-gray-400 font-bold uppercase tracking-wider text-[10px]">Progreso</span>
+                      <div className="w-[140px]">
+                        <CeldaProgreso
+                          progreso={progresoPorUsuario.get(usuario.id)}
+                          cargando={cargandoProgreso}
+                          onVerDetalle={setDetalleProgreso}
                         />
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20">
-                          {etiquetaRol(usuario.rol)}
-                        </span>
-                      )}
-                    </td>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ========================================================= */}
+            {/* VISTA ESCRITORIO: Diseño Original Intacto */}
+            {/* ========================================================= */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Nombre</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Correo Electrónico</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Departamento</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Progreso</th>
+                    <th className="pb-4 px-4 text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400">Rol & Accesos</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {usuariosOrdenados.map((usuario) => (
+                    <tr key={usuario.id} className="transition-colors hover:bg-gray-50/50">
+                      <td className="px-4 py-5 font-bold text-gray-900">{usuario.nombre}</td>
+                      <td className="px-4 py-5 font-medium text-gray-500">{usuario.email}</td>
+                      <td className="px-4 py-5 font-medium text-gray-500">
+                        {usuario.departamento ? (
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            {usuario.departamento}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-5">
+                        <CeldaProgreso
+                          progreso={progresoPorUsuario.get(usuario.id)}
+                          cargando={cargandoProgreso}
+                          onVerDetalle={setDetalleProgreso}
+                        />
+                      </td>
+                      <td className="px-4 py-5">
+                        {puedeEditarRoles && esRolEditable(usuario.rol) ? (
+                          <ToggleRol
+                            usuario={usuario}
+                            cargando={actualizandoId === usuario.id}
+                            esUsuarioActual={esUsuarioActual(usuario)}
+                            onCambiar={(nuevoRol) => cambiarRol(usuario, nuevoRol)}
+                          />
+                        ) : (
+                          <span className="inline-flex items-center rounded-full bg-brand-orange/10 px-3 py-1 text-xs font-bold text-brand-orange border border-brand-orange/20">
+                            {etiquetaRol(usuario.rol)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {!cargando && !error && paginacion && (
-          <div className="mt-6 pt-6 border-t border-gray-100 flex justify-end">
+          <div className="mt-6 sm:mt-8 pt-6 border-t border-gray-100 flex justify-center sm:justify-end">
             <Paginador paginacion={paginacion} onCambiarPagina={setPagina} />
           </div>
         )}

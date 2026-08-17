@@ -13,8 +13,6 @@ interface CirculoVirtuosoProps {
 }
 
 const RADIUS = 3.2;
-// El aro conector es un poco más chico que el radio de los nodos: así pasa
-// por detrás de cada uno en vez de coincidir exactamente con su borde.
 const RING_RADIUS = RADIUS - 0.18;
 const FRONT_ANGLE = Math.PI / 2;
 

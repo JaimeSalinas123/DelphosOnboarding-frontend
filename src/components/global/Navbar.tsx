@@ -6,6 +6,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { authService } from "@/services/authService";
 import { useProgresoStore } from "@/lib/useProgresoStore";
+import { INSIGNIAS, insigniaDesbloqueada } from "@/lib/insignias";
+import InsigniaMedalla from "@/components/global/InsigniaMedalla";
 
 // Circunferencia del anillo de progreso (r=15.5): 2 * PI * 15.5
 const CIRCUNFERENCIA_ANILLO = 2 * Math.PI * 15.5;
@@ -47,7 +49,6 @@ export default function Navbar() {
   const progresoMenuRef = useRef<HTMLDivElement>(null);
 
   const [initials, setInitials] = useState("DO");
-  // El progreso de onboarding solo aplica a pasantes en curso, no a evaluadores/administradores.
   const [esPasante, setEsPasante] = useState(false);
 
   const progreso = useProgresoStore((s) => s.progreso);
@@ -119,24 +120,36 @@ export default function Navbar() {
 
   return (
     <nav className="fixed start-0 top-0 z-50 w-full border-b border-default bg-neutral-primary/90 backdrop-blur">
-      <div className="mx-auto flex max-w-screen-xl flex-wrap items-center justify-between p-4">
+      <div className="mx-auto flex max-w-screen-xl items-center justify-between px-3 py-3 sm:px-4 sm:py-4">
+        
+        {/* ========================================================= */}
+        {/* LOGO CON TEXTO APILADO EN MÓVIL Y EN LÍNEA EN PC */}
+        {/* ========================================================= */}
         <Link
           href="/onboarding"
-          className="flex items-center space-x-3 transition-opacity hover:opacity-80 rtl:space-x-reverse"
+          className="flex shrink-0 items-center gap-2 sm:gap-3 transition-opacity hover:opacity-80 rtl:space-x-reverse"
+          onClick={() => setMobileOpen(false)}
         >
           <Image
             src="/images/logo.svg"
             alt="Logo Delphos"
             width={33}
             height={32}
-            style={{ width: "auto", height: "32px" }}
+            className="h-8 w-auto"
           />
-          <span className="self-center whitespace-nowrap text-xl font-semibold text-heading">
-            Delphos <span className="text-brand-orange">Onboarding</span>
-          </span>
+          {/* Contenedor que apila los textos en móvil y los alinea en PC */}
+          <div className="flex flex-col justify-center sm:flex-row sm:items-center sm:gap-1.5">
+            <span className="text-sm font-bold leading-none text-heading sm:text-xl sm:font-semibold">
+              Delphos
+            </span>
+            <span className="text-[11px] font-bold leading-none text-brand-orange sm:text-xl sm:font-semibold mt-[2px] sm:mt-0">
+              Onboarding
+            </span>
+          </div>
         </Link>
 
-        <div className="flex items-center space-x-3 md:order-2 rtl:space-x-reverse">
+        {/* LADO DERECHO (Progreso, Avatar, Hamburguesa) */}
+        <div className="flex items-center gap-2 sm:gap-3 md:order-2 rtl:space-x-reverse">
           {esPasante && progresoCargado ? (
             <div className="relative" ref={progresoMenuRef}>
               <button
@@ -144,9 +157,9 @@ export default function Navbar() {
                 onClick={() => setProgresoMenuOpen((open) => !open)}
                 aria-expanded={progresoMenuOpen}
                 aria-haspopup="true"
-                className="flex cursor-pointer items-center gap-2 rounded-full border border-default bg-neutral-primary px-2.5 py-1.5 text-xs font-semibold text-heading transition-colors hover:border-brand-orange/40 focus:outline-none focus:ring-4 focus:ring-brand-orange/20"
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border border-default bg-neutral-primary px-2 py-1.5 text-xs font-semibold text-heading transition-colors hover:border-brand-orange/40 focus:outline-none focus:ring-4 focus:ring-brand-orange/20 sm:gap-2 sm:px-2.5"
               >
-                <svg viewBox="0 0 36 36" className="h-6 w-6 -rotate-90 flex-shrink-0">
+                <svg viewBox="0 0 36 36" className="h-5 w-5 shrink-0 -rotate-90 sm:h-6 sm:w-6">
                   <circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--neutral-tertiary)" strokeWidth="4" />
                   <circle
                     cx="18"
@@ -168,7 +181,7 @@ export default function Navbar() {
               </button>
 
               {progresoMenuOpen ? (
-                <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-xl border border-default bg-neutral-primary p-4 shadow-lg">
+                <div className="absolute right-0 mt-3 w-80 overflow-hidden rounded-xl border border-default bg-neutral-primary p-4 shadow-lg">
                   <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">
                     Tu progreso de onboarding
                   </p>
@@ -192,6 +205,36 @@ export default function Navbar() {
                       </div>
                     ))}
                   </div>
+
+                  <div className="mt-4 border-t border-default pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-brand-gray">
+                      Insignias
+                    </p>
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {INSIGNIAS.map((insignia) => {
+                        const desbloqueada = insigniaDesbloqueada(insignia, progreso);
+                        return (
+                          <div key={insignia.id} className="flex flex-col items-center gap-1.5" title={insignia.descripcion}>
+                            <InsigniaMedalla desbloqueada={desbloqueada} tamano={40} />
+                            <span
+                              className={`text-center text-[10px] font-medium leading-tight ${
+                                desbloqueada ? "text-heading" : "text-brand-gray"
+                              }`}
+                            >
+                              {insignia.nombre}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/perfil"
+                    className="mt-4 block text-center text-[11px] font-semibold text-brand-orange hover:text-brand-orange/80"
+                  >
+                    Ver mi perfil completo
+                  </Link>
                 </div>
               ) : null}
             </div>
@@ -207,7 +250,7 @@ export default function Navbar() {
               aria-label="Abrir menú de usuario"
             >
               <span className="sr-only">Abrir menú de usuario</span>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-orange text-sm font-semibold text-white tracking-wider">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-orange text-xs font-semibold tracking-wider text-white sm:h-9 sm:w-9 sm:text-sm">
                 {initials}
               </span>
             </button>
@@ -233,24 +276,30 @@ export default function Navbar() {
 
           <button
             type="button"
-            className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-body transition-colors hover:bg-neutral-secondary hover:text-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/20 md:hidden"
+            className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-brand-orange/20 md:hidden ${
+              mobileOpen 
+                ? "bg-brand-orange/10 text-brand-orange" 
+                : "text-body hover:bg-neutral-secondary hover:text-brand-orange"
+            }`}
             aria-controls="navbar-user"
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((open) => !open)}
           >
             <span className="sr-only">Abrir menú principal</span>
-            <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 17 14">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15" />
-            </svg>
+            {mobileOpen ? (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 17 14">
+                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15" />
+              </svg>
+            )}
           </button>
         </div>
 
-        <div
-          className={`w-full items-center justify-between ${
-            mobileOpen ? "flex" : "hidden"
-          } md:order-1 md:flex md:w-auto`}
-          id="navbar-user"
-        >
+        {/* MENÚ ESCRITORIO ORIGINAL (Intacto, se oculta en celular) */}
+        <div className="hidden items-center justify-between md:order-1 md:flex md:w-auto" id="navbar-desktop">
           <ul className="mt-4 flex flex-col gap-1 md:mt-0 md:flex-row md:items-center md:gap-1">
             {NAV_LINKS.map((link) => {
               const isActive = link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href);
@@ -308,6 +357,70 @@ export default function Navbar() {
             })}
           </ul>
         </div>
+      </div>
+
+      {/* MENÚ MÓVIL DESPLEGABLE (Aplanado y usando tus variables) */}
+      <div 
+        className={`md:hidden w-full overflow-hidden transition-all duration-300 ease-in-out bg-neutral-primary ${
+          mobileOpen ? "max-h-screen border-t border-default opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <ul className="flex flex-col gap-1 px-4 py-4">
+          {NAV_LINKS.map((link) => {
+            const isActive = link.href === "/" ? pathname === "/" : pathname?.startsWith(link.href);
+
+            if (link.subLinks) {
+              return (
+                <li key={link.href} className="flex flex-col mb-1">
+                  <Link
+                    href={link.href}
+                    className={`block rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                      isActive ? "bg-brand-orange/10 text-brand-orange" : "text-heading hover:bg-neutral-secondary"
+                    }`}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                  
+                  {/* Sub-menú aplanado con sangría y línea naranja */}
+                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l-2 border-brand-orange/30 pl-3">
+                    {link.subLinks.map((subLink) => {
+                      const isSubActive = pathname?.startsWith(subLink.href);
+                      return (
+                        <Link
+                          key={subLink.href}
+                          href={subLink.href}
+                          className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            isSubActive 
+                              ? "bg-brand-orange/10 text-brand-orange" 
+                              : "text-body hover:bg-neutral-secondary hover:text-brand-orange"
+                          }`}
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          {subLink.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </li>
+              );
+            }
+
+            return (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className={`block rounded-lg px-3 py-2.5 text-base font-medium transition-colors ${
+                    isActive ? "bg-brand-orange/10 text-brand-orange" : "text-heading hover:bg-neutral-secondary"
+                  }`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </nav>
   );
