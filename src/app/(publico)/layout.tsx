@@ -20,16 +20,10 @@ export default function PublicoLayout({
   const pathname = usePathname();
   const mostrarFooter = pathname !== '/ecosistema';
   
-  // Estado para controlar si mostramos la pantalla de inactividad
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState(false);
-  
-  // Referencia para el temporizador de inactividad
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 30 minutos en milisegundos
-  const TIEMPO_INACTIVIDAD_MS = 30 * 60 * 1000;
+  const TIEMPO_INACTIVIDAD_MS = 30 * 60 * 1000; // 30 minutos
 
-  // Función para reiniciar el cronómetro
   const resetearTemporizador = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     
@@ -40,31 +34,47 @@ export default function PublicoLayout({
     }, TIEMPO_INACTIVIDAD_MS);
   };
 
-  // Efecto para escuchar la actividad del usuario (mueve el mouse, teclea, etc.)
+  // =======================================================================
+  // 🚀 OPTIMIZACIÓN DE RENDIMIENTO EXTREMA (Throttling)
+  // =======================================================================
   useEffect(() => {
     if (isAuthenticated && !sessionExpiredMsg) {
       const eventosActividad = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-      const manejarActividad = () => resetearTemporizador();
+      
+      let ultimaActividad = Date.now();
 
-      resetearTemporizador(); // Arranca el reloj
+      const manejarActividad = () => {
+        const ahora = Date.now();
+        // Solo ejecuta el reseteo si han pasado más de 5 segundos desde el último movimiento.
+        // Esto ahorra miles de ejecuciones innecesarias de JavaScript en el navegador.
+        if (ahora - ultimaActividad > 5000) {
+          ultimaActividad = ahora;
+          resetearTemporizador();
+        }
+      };
 
-      eventosActividad.forEach(evento => document.addEventListener(evento, manejarActividad));
+      resetearTemporizador(); // Arranca el reloj inicial
+
+      // Usamos 'passive: true' para que el scroll no se trabe (Best practice de React)
+      eventosActividad.forEach(evento => 
+        document.addEventListener(evento, manejarActividad, { passive: true })
+      );
 
       return () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        eventosActividad.forEach(evento => document.removeEventListener(evento, manejarActividad));
+        eventosActividad.forEach(evento => 
+          document.removeEventListener(evento, manejarActividad)
+        );
       };
     }
   }, [isAuthenticated, sessionExpiredMsg]);
 
-  // Si el sistema revisa la memoria y NO estás logueado (y no es por inactividad), expulsa al login.
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !sessionExpiredMsg) {
       router.push('/login');
     }
   }, [isLoading, isAuthenticated, router, sessionExpiredMsg]);
 
-  // CASO 1: BLOQUEO POR INACTIVIDAD (Renderizamos el nuevo componente global)
   if (sessionExpiredMsg) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
@@ -73,7 +83,6 @@ export default function PublicoLayout({
     );
   }
 
-  // CASO 2: PANTALLA DE CARGA (Refresh)
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
@@ -88,23 +97,20 @@ export default function PublicoLayout({
     );
   }
 
-  // CASO 3: INTRUSO
   if (!isAuthenticated) {
     return null; 
   }
 
-  // CASO 4: CREDENCIALES VÁLIDAS
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 relative">
+    <div className="min-h-screen flex flex-col bg-white relative">
       <Navbar />
       
-      <main className="flex flex-1 flex-col pt-[68px]">
+      <main className="flex flex-1 flex-col pt-[72px] lg:pt-[84px] bg-white">
         {children}
       </main>
 
       {mostrarFooter && <FooterPublico />}
 
-      {/* El asistente virtual vive exclusivamente en las rutas protegidas */}
       <ChatbotFlotante />
     </div>
   );
